@@ -5,30 +5,23 @@ import (
 	"sync"
 )
 
+const (
+	REQUEST_LIST_LENGTH = 100
+)
+
 // 回应处理器
 type ResponseHandler struct {
 	chReq        chan *req
-	chClose      chan struct{}
 	closed       bool
 	requesterMap sync.Map
 }
 
-// 创建
-func NewResponseHandler() *ResponseHandler {
-	handler := &ResponseHandler{}
-	handler.Init()
-	return handler
-}
-
 // 初始化
-func (h *ResponseHandler) Init() {
-	h.chReq = make(chan *req, 100)
-	h.chClose = make(chan struct{})
-}
-
-// 添加请求者
-func (h *ResponseHandler) AddRequester(r *Requester) {
-	h.requesterMap.Store(r, true)
+func (h *ResponseHandler) Init(reqLen int32) {
+	if reqLen <= 0 {
+		reqLen = REQUEST_LIST_LENGTH
+	}
+	h.chReq = make(chan *req, reqLen)
 }
 
 // 关闭
@@ -36,8 +29,13 @@ func (h *ResponseHandler) Close() {
 	if h.closed {
 		return
 	}
-	close(h.chClose)
+	close(h.chReq)
 	h.closed = true
+}
+
+// 添加请求者
+func (h *ResponseHandler) AddRequester(r *Requester) {
+	h.requesterMap.Store(r, true)
 }
 
 // 接收请求
@@ -60,7 +58,7 @@ func (h *ResponseHandler) Update() error {
 	select {
 	case r, o := <-h.chReq:
 		if !o {
-			return errors.New("gproc: service already closed, break loop")
+			return errors.New("gproc: response handler already closed, break loop")
 		}
 		// 处理请求
 		h.requesterMap.Range(func(key, _ interface{}) bool {

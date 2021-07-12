@@ -56,10 +56,11 @@ func NewShopService() *ShopService {
 
 // 初始化
 func (s *ShopService) Init() {
-	s.LocalService.Init()
+	s.LocalService.Init(0)
 	s.itemList = make([]*ShopItem, 0)
 	s.RegisterHandle("getItemListReq", s.getItemList)
 	s.RegisterHandle("buyItemReq", s.buyItem)
+	s.SetTickHandle(s.tick)
 }
 
 // 添加物品
@@ -119,20 +120,35 @@ func (s *ShopService) buyItem(peer IReceiver, args interface{}) {
 	}
 	if foundItem == nil {
 		resp.Err = -1 // 没有该物品
+		log.Printf("not found item %v", req.instId)
 	} else {
 		if foundItem.price*req.count > req.totalMoney {
 			resp.Err = -2
+			log.Printf("money %v not enough to buy item %v count %v, need money %v", req.totalMoney, foundItem.instId, req.count, foundItem.price*req.count)
 		} else if foundItem.count < req.count {
 			resp.Err = -3
+			log.Printf("item %v count %v not enough to buy, need %v", foundItem.instId, foundItem.count, req.count)
 		} else {
 			foundItem.count -= req.count
 			resp.instId = foundItem.instId
 			resp.id = foundItem.id
 			resp.count = foundItem.count
 			resp.costMoney = foundItem.price * req.count
+			log.Printf("bought item %v count %v, cost money %v", foundItem.instId, req.count, resp.costMoney)
 		}
 	}
 	peer.Receive(nil, "buyItemRep", resp)
+}
+
+// 定时器处理
+func (s *ShopService) tick(tick int32) {
+	// 价格随时间变化
+	for i := 0; i < len(s.itemList); i++ {
+		item := s.itemList[i]
+		if item != nil {
+			item.price += (rand.Int31n(int32(item.price)) - item.price/2)
+		}
+	}
 }
 
 type Item struct {
@@ -152,7 +168,8 @@ type Player struct {
 // 创建玩家
 func NewPlayer(money int32) *Player {
 	p := &Player{money: money, itemList: make([]*Item, 0)}
-	p.Init()
+	p.Init(10)
+	log.Printf("player data: %v", *p)
 	return p
 }
 
@@ -164,8 +181,8 @@ func (p *Player) CreateShopRequester(shop *ShopService) {
 // 注册回调
 func (p *Player) RegisterResponseHandlers() {
 	p.shopRequester.RegisterCallback("getItemListResp", func(param interface{}) {
-		resp := param.(*GetItemListResp)
-		log.Printf("get item list: %v", resp.itemList)
+		//resp := param.(*GetItemListResp)
+		//log.Printf("get item list: %v", resp.itemList)
 	})
 	p.shopRequester.RegisterCallback("buyItemResp", func(param interface{}) {
 		resp := param.(*BuyItemResp)
@@ -258,7 +275,7 @@ func TestShopService(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < playerCount; i++ {
-		p := NewPlayer(rand.Int31n(100000))
+		p := NewPlayer(100000)
 		p.CreateShopRequester(shop)
 		p.RegisterResponseHandlers()
 		go p.Run(&wg)
