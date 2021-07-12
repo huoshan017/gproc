@@ -173,6 +173,10 @@ func (p *Player) RegisterResponseHandlers() {
 	})
 	p.shopRequester.RegisterCallback("buyItemResp", func(param interface{}) {
 		resp := param.(*BuyItemResp)
+		if resp.Err < 0 {
+			log.Printf("buy item failed, err %v", resp.Err)
+			return
+		}
 		p.money -= resp.costMoney
 		var item *Item
 		for i := 0; i < len(p.itemList); i++ {
@@ -185,7 +189,7 @@ func (p *Player) RegisterResponseHandlers() {
 		if item != nil {
 			item.count += resp.count
 		} else {
-			log.Fatalf("item %v not found, buy item failed", resp.instId)
+			log.Printf("item %v not found, buy item failed", resp.instId)
 			return
 		}
 		log.Printf("buy item %v count %v success, cost %v money", resp.instId, resp.count, resp.costMoney)
@@ -214,7 +218,7 @@ func (p *Player) Run() {
 			p.BuyItem(itemIdList[idx], rand.Int31n(1000))
 		}
 		p.Update()
-		time.Sleep(time.Millisecond)
+		time.Sleep(time.Millisecond*50)
 	}
 }
 
@@ -241,7 +245,7 @@ func TestShopService(t *testing.T) {
 	defer shop.Close()
 
 	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1000; i++ {
 		p := NewPlayer(rand.Int31n(100000))
 		p.CreateShopRequester(shop)
 		p.RegisterResponseHandlers()
