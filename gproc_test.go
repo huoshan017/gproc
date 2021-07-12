@@ -266,7 +266,7 @@ func TestShopService(t *testing.T) {
 		shop.AddItem(itemList[i])
 	}
 
-	playerCount := 1000
+	playerCount := 10000
 	var wg sync.WaitGroup
 	wg.Add(playerCount)
 

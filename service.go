@@ -104,12 +104,13 @@ func (s *LocalService) runProcessReq() error {
 	return nil
 }
 
-// 处理请求
+// 处理请求或者返回的结果
 func (s *LocalService) processReq(r *req) {
 	// 处理请求
 	if s.handle(r.peer, r.name, r.args) {
 		return
 	}
+	// 遍历请求者处理结果
 	s.requesterMap.Range(func(key, _ interface{}) bool {
 		req, o := key.(*Requester)
 		if !o {
@@ -119,7 +120,7 @@ func (s *LocalService) processReq(r *req) {
 	})
 }
 
-// 处理
+// 处理返回的结果
 func (s *LocalService) handle(peer IReceiver, reqName string, args interface{}) bool {
 	h, o := s.handleMap[reqName]
 	if !o {
