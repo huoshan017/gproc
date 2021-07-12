@@ -31,11 +31,6 @@ func (h *ResponseHandler) AddRequester(r *Requester) {
 	h.requesterMap.Store(r, true)
 }
 
-// 删除请求者
-func (h *ResponseHandler) RemoveRequester(r *Requester) {
-	h.requesterMap.Delete(r)
-}
-
 // 关闭
 func (h *ResponseHandler) Close() {
 	if h.closed {
