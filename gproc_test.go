@@ -3,6 +3,7 @@ package gproc
 import (
 	"log"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 )
@@ -207,18 +208,20 @@ func (p *Player) BuyItem(instId int32, count int32) {
 }
 
 // 循环处理
-func (p *Player) Run() {
-	for {
+func (p *Player) Run(wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for i := 0; i < 1000; i++ {
 		r := rand.Int31n(2)
 		if r == 0 {
 			p.GetItemList()
 		} else {
 			itemIdList := []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 			idx := rand.Int31n(int32(len(itemIdList)))
-			p.BuyItem(itemIdList[idx], rand.Int31n(1000))
+			p.BuyItem(itemIdList[idx], rand.Int31n(10))
 		}
 		p.Update()
-		time.Sleep(time.Millisecond*50)
+		time.Sleep(time.Millisecond * 50)
 	}
 }
 
@@ -241,18 +244,20 @@ func TestShopService(t *testing.T) {
 		shop.AddItem(itemList[i])
 	}
 
+	playerCount := 1000
+	var wg sync.WaitGroup
+	wg.Add(playerCount)
+
 	go shop.Run()
 	defer shop.Close()
 
 	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < playerCount; i++ {
 		p := NewPlayer(rand.Int31n(100000))
 		p.CreateShopRequester(shop)
 		p.RegisterResponseHandlers()
-		go p.Run()
+		go p.Run(&wg)
 	}
 
-	for {
-		time.Sleep(time.Millisecond)
-	}
+	wg.Wait()
 }
