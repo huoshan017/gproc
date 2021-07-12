@@ -1,0 +1,254 @@
+package gproc
+
+import (
+	"log"
+	"math/rand"
+	"testing"
+	"time"
+)
+
+// 商店物品
+type ShopItem struct {
+	instId int32
+	id     int32
+	count  int32
+	price  int32
+}
+
+// 商店服务
+type ShopService struct {
+	LocalService
+
+	itemList []*ShopItem
+}
+
+// 物品列表请求
+type GetItemListReq struct {
+}
+
+// 物品列表返回
+type GetItemListResp struct {
+	itemList []*ShopItem
+}
+
+// 购买物品请求
+type BuyItemReq struct {
+	instId     int32
+	count      int32
+	totalMoney int32
+}
+
+// 购买物品返回
+type BuyItemResp struct {
+	Err       int32
+	instId    int32
+	count     int32
+	costMoney int32
+}
+
+// 创建商店服务
+func NewShopService() *ShopService {
+	service := &ShopService{}
+	service.Init()
+	service.itemList = make([]*ShopItem, 0)
+	service.SetHandle(service.Handle)
+	return service
+}
+
+// 添加物品
+func (s *ShopService) AddItem(item *ShopItem) {
+	s.itemList = append(s.itemList, item)
+}
+
+// 删除物品
+func (s *ShopService) RemoveItem(instId int32, count int32) bool {
+	if count <= 0 {
+		return false
+	}
+
+	for i := 0; i < len(s.itemList); i++ {
+		item := s.itemList[i]
+		if item.instId == instId && item.count >= count {
+			item.count -= count
+			return true
+		}
+	}
+
+	return false
+}
+
+// 接口实现
+func (s *ShopService) Handle(peerReceiver IReceiver, reqName string, arg interface{}) bool {
+	switch reqName {
+	case "getItemListReq":
+		s.getItemList(peerReceiver, arg.(*GetItemListReq))
+	case "buyItemReq":
+		s.buyItem(peerReceiver, arg.(*BuyItemReq))
+	default:
+		return false
+	}
+	return true
+}
+
+// 处理获取物品列表
+func (s *ShopService) getItemList(peer IReceiver, req *GetItemListReq) {
+	resp := &GetItemListResp{}
+	for i := 0; i < len(s.itemList); i++ {
+		item := s.itemList[i]
+		resp.itemList = append(resp.itemList, &ShopItem{
+			instId: item.instId,
+			id:     item.id,
+			count:  item.count,
+			price:  item.price,
+		})
+	}
+	peer.Receive(nil, "getItemListResp", resp)
+}
+
+// 处理购买物品
+func (s *ShopService) buyItem(peer IReceiver, req *BuyItemReq) {
+	resp := &BuyItemResp{}
+	if req.instId <= 0 || req.count <= 0 {
+		resp.Err = -2
+		peer.Receive(nil, "buyItemResp", resp)
+		return
+	}
+
+	var foundItem *ShopItem
+	for i := 0; i < len(s.itemList); i++ {
+		item := s.itemList[i]
+		if item.instId == req.instId {
+			foundItem = item
+			break
+		}
+	}
+	if foundItem == nil {
+		resp.Err = -1 // 没有该物品
+	} else {
+		if foundItem.price*req.count > req.totalMoney {
+			resp.Err = -2
+		} else if foundItem.count < req.count {
+			resp.Err = -3
+		} else {
+			foundItem.count -= req.count
+			resp.instId = foundItem.instId
+			resp.count = foundItem.count
+			resp.costMoney = foundItem.price * req.count
+		}
+	}
+	peer.Receive(nil, "buyItemRep", resp)
+}
+
+type Item struct {
+	instId int32
+	id     int32
+	count  int32
+}
+
+// 玩家
+type Player struct {
+	ResponseHandler // 一般是通过继承来使用ResponseHandler
+	shopRequester   *Requester
+	money           int32
+	itemList        []*Item
+}
+
+// 创建玩家
+func NewPlayer(money int32) *Player {
+	p := &Player{money: money, itemList: make([]*Item, 0)}
+	p.Init()
+	return p
+}
+
+// 创建商店请求者
+func (p *Player) CreateShopRequester(shop *ShopService) {
+	p.shopRequester = NewRequester4ResponseHandler(&p.ResponseHandler, shop)
+}
+
+// 注册回调
+func (p *Player) RegisterResponseHandlers() {
+	p.shopRequester.RegisterCallback("getItemListResp", func(param interface{}) {
+		resp := param.(*GetItemListResp)
+		log.Printf("get item list: %v", resp.itemList)
+	})
+	p.shopRequester.RegisterCallback("buyItemResp", func(param interface{}) {
+		resp := param.(*BuyItemResp)
+		p.money -= resp.costMoney
+		var item *Item
+		for i := 0; i < len(p.itemList); i++ {
+			tmpItem := p.itemList[i]
+			if tmpItem.instId == resp.instId {
+				item = tmpItem
+				break
+			}
+		}
+		if item != nil {
+			item.count += resp.count
+		} else {
+			log.Fatalf("item %v not found, buy item failed", resp.instId)
+			return
+		}
+		log.Printf("buy item %v count %v success, cost %v money", resp.instId, resp.count, resp.costMoney)
+	})
+}
+
+// 获得物品列表
+func (p *Player) GetItemList() {
+	p.shopRequester.Request("getItemListReq", &GetItemListReq{})
+}
+
+// 购买物品
+func (p *Player) BuyItem(instId int32, count int32) {
+	p.shopRequester.Request("buyItemReq", &BuyItemReq{instId: instId, count: count, totalMoney: p.money})
+}
+
+// 循环处理
+func (p *Player) Run() {
+	for {
+		r := rand.Int31n(2)
+		if r == 0 {
+			p.GetItemList()
+		} else {
+			itemIdList := []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+			idx := rand.Int31n(int32(len(itemIdList)))
+			p.BuyItem(itemIdList[idx], rand.Int31n(1000))
+		}
+		p.Update()
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// 商店服务测试
+func TestShopService(t *testing.T) {
+	itemList := []*ShopItem{
+		{1, 1, 100, 10},
+		{2, 2, 200, 20},
+		{3, 3, 300, 30},
+		{4, 4, 400, 40},
+		{5, 5, 500, 50},
+		{6, 6, 600, 60},
+		{7, 7, 700, 70},
+		{8, 8, 800, 80},
+		{9, 9, 900, 90},
+		{10, 10, 1000, 100},
+	}
+	shop := NewShopService()
+	for i := 0; i < len(itemList); i++ {
+		shop.AddItem(itemList[i])
+	}
+
+	go shop.Run()
+	defer shop.Close()
+
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 10; i++ {
+		p := NewPlayer(rand.Int31n(100000))
+		p.CreateShopRequester(shop)
+		p.RegisterResponseHandlers()
+		go p.Run()
+	}
+
+	for {
+		time.Sleep(time.Millisecond)
+	}
+}
