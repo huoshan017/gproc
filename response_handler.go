@@ -11,7 +11,7 @@ const (
 
 // 回应处理器
 type ResponseHandler struct {
-	chReq        chan *req
+	ch           chan *req
 	closed       bool
 	requesterMap sync.Map
 }
@@ -21,7 +21,7 @@ func (h *ResponseHandler) Init(reqLen int32) {
 	if reqLen <= 0 {
 		reqLen = REQUEST_LIST_LENGTH
 	}
-	h.chReq = make(chan *req, reqLen)
+	h.ch = make(chan *req, reqLen)
 }
 
 // 关闭
@@ -29,12 +29,12 @@ func (h *ResponseHandler) Close() {
 	if h.closed {
 		return
 	}
-	close(h.chReq)
+	close(h.ch)
 	h.closed = true
 }
 
 // 添加请求者
-func (h *ResponseHandler) AddRequester(r *Requester) {
+func (h *ResponseHandler) AddRequester(r IRequester) {
 	h.requesterMap.Store(r, true)
 }
 
@@ -45,7 +45,7 @@ func (h *ResponseHandler) Receive(peer IReceiver, reqName string, args interface
 		return ErrClosed
 	}
 	// 请求写入
-	h.chReq <- &req{
+	h.ch <- &req{
 		name: reqName,
 		args: args,
 		peer: peer,
@@ -56,13 +56,13 @@ func (h *ResponseHandler) Receive(peer IReceiver, reqName string, args interface
 // 更新处理回调
 func (h *ResponseHandler) Update() error {
 	select {
-	case r, o := <-h.chReq:
+	case r, o := <-h.ch:
 		if !o {
 			return errors.New("gproc: response handler already closed, break loop")
 		}
 		// 处理请求
 		h.requesterMap.Range(func(key, _ interface{}) bool {
-			req, o := key.(*Requester)
+			req, o := key.(IRequester)
 			if !o {
 				return false
 			}

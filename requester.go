@@ -7,8 +7,8 @@ type Requester struct {
 	owner       IReceiver
 }
 
-// 创建请求者，第一个参数为ResponseHandler
-func NewRequester4ResponseHandler(handler *ResponseHandler, receiver IReceiver) *Requester {
+// 创建请求者
+func NewRequester(handler IHandler, receiver IReceiver) IRequester {
 	if handler == nil || receiver == nil {
 		panic("handler or receiver is nil")
 	}
@@ -18,20 +18,6 @@ func NewRequester4ResponseHandler(handler *ResponseHandler, receiver IReceiver) 
 		owner:       handler,
 	}
 	handler.AddRequester(req)
-	return req
-}
-
-// 创建请求者，第一个参数为LocalService
-func NewRequester4LocalService(service *LocalService, receiver IReceiver) *Requester {
-	if service == nil || receiver == nil {
-		panic("service or receiver is nil")
-	}
-	req := &Requester{
-		receiver:    receiver,
-		callbackMap: make(map[string]func(interface{})),
-		owner:       service,
-	}
-	service.AddRequester(req)
 	return req
 }
 

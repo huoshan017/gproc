@@ -16,13 +16,6 @@ type ShopItem struct {
 	price  int32
 }
 
-// 商店服务
-type ShopService struct {
-	LocalService
-
-	itemList []*ShopItem
-}
-
 // 物品列表请求
 type GetItemListReq struct {
 }
@@ -46,6 +39,13 @@ type BuyItemResp struct {
 	id        int32
 	count     int32
 	costMoney int32
+}
+
+// 商店服务
+type ShopService struct {
+	LocalService
+
+	itemList []*ShopItem
 }
 
 // 创建商店服务
@@ -160,7 +160,7 @@ type Item struct {
 // 玩家
 type Player struct {
 	ResponseHandler // 一般是通过继承来使用ResponseHandler
-	shopRequester   *Requester
+	shopRequester   IRequester
 	money           int32
 	itemList        []*Item
 }
@@ -175,7 +175,7 @@ func NewPlayer(money int32) *Player {
 
 // 创建商店请求者
 func (p *Player) CreateShopRequester(shop *ShopService) {
-	p.shopRequester = NewRequester4ResponseHandler(&p.ResponseHandler, shop)
+	p.shopRequester = NewRequester(p, shop)
 }
 
 // 注册回调
@@ -232,7 +232,7 @@ func (p *Player) Run(wg *sync.WaitGroup) {
 			p.BuyItem(itemIdList[idx], rand.Int31n(10))
 		}
 		p.Update()
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 5)
 	}
 }
 

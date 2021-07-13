@@ -70,7 +70,7 @@ func (s *LocalService) runProcessReqAndTick() error {
 	lastTime := time.Now()
 	for run {
 		select {
-		case r, o := <-s.chReq:
+		case r, o := <-s.ch:
 			if !o {
 				return errors.New("gproc: service already closed, break loop")
 			}
@@ -92,7 +92,7 @@ func (s *LocalService) runProcessReq() error {
 	run := true
 	for run {
 		select {
-		case r, o := <-s.chReq:
+		case r, o := <-s.ch:
 			if !o {
 				return errors.New("gproc: service already closed, break loop")
 			}
@@ -110,7 +110,7 @@ func (s *LocalService) processReq(r *req) {
 	if s.handle(r.peer, r.name, r.args) {
 		return
 	}
-	// 遍历请求者处理结果
+	// 遍历请求者处理回调
 	s.requesterMap.Range(func(key, _ interface{}) bool {
 		req, o := key.(*Requester)
 		if !o {
