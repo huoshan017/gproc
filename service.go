@@ -106,21 +106,19 @@ func (s *LocalService) runProcessReq() error {
 
 // 处理请求或者返回的结果
 func (s *LocalService) processReq(r *req) {
-	// 处理请求
+	// 处理外部请求
 	if s.handle(r.peer, r.name, r.args) {
 		return
 	}
-	// 遍历请求者处理回调
-	s.requesterMap.Range(func(key, _ interface{}) bool {
-		req, o := key.(*Requester)
-		if !o {
-			return false
+	// 遍历内部IRequester处理请求后的回调
+	for k, _ := range s.requesterMap {
+		if k.handle(r.peer, r.name, r.args) {
+			break
 		}
-		return req.handle(r.peer, r.name, r.args)
-	})
+	}
 }
 
-// 处理返回的结果
+// 处理单个IRequester请求后的回调
 func (s *LocalService) handle(peer IReceiver, reqName string, args interface{}) bool {
 	h, o := s.handleMap[reqName]
 	if !o {

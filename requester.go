@@ -31,6 +31,15 @@ func (r *Requester) RegisterCallback(respName string, callback func(interface{})
 	r.callbackMap[respName] = callback
 }
 
+// 请求带回调
+func (r *Requester) RequestWithCallback(reqName string, arg interface{}, respName string, callback func(interface{})) error {
+	err := r.Request(reqName, arg)
+	if err == nil {
+		r.callbackMap[respName] = callback
+	}
+	return err
+}
+
 // 处理回调
 func (r *Requester) handle(peer IReceiver, respName string, arg interface{}) bool {
 	callback, o := r.callbackMap[respName]
