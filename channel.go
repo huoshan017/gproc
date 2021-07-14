@@ -1,7 +1,7 @@
 package gproc
 
 const (
-	CHANNEL_LENGTH = 500
+	CHANNEL_LENGTH = 200
 )
 
 // 通道

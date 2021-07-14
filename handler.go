@@ -8,7 +8,7 @@ type Handler struct {
 // 创建消息处理器
 func (h *Handler) Init(createChannel bool) {
 	if createChannel {
-		h.channel = NewChannel(0)
+		h.channel = NewChannel(CHANNEL_LENGTH)
 	}
 }
 
