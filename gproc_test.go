@@ -176,7 +176,7 @@ func NewPlayer(money int32) *Player {
 
 // 创建商店请求者
 func (p *Player) CreateShopRequester(shop *ShopService) {
-	p.shopRequester = NewRequester(&p.ResponseHandler, &shop.RequestHandler)
+	p.shopRequester = NewRequester(p, shop)
 }
 
 // 注册回调

@@ -5,14 +5,14 @@ import "fmt"
 // 请求者，发起请求到IReceiver，除创建初始化外整个生命周期在同一个goroutine中
 // 一般跟IReceiver不在同一个goroutine
 type Requester struct {
-	owner       *ResponseHandler
-	handler     *RequestHandler
+	owner       IResponseHandler
+	handler     IRequestHandler
 	req2RespMap map[string]string
 	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为callbackMap初始化时还未开始执行handle
 }
 
 // 创建请求者
-func NewRequester(owner *ResponseHandler, handler *RequestHandler) IRequester {
+func NewRequester(owner IResponseHandler, handler IRequestHandler) IRequester {
 	if owner == nil || handler == nil {
 		panic("owner or receiver is nil")
 	}
@@ -28,14 +28,16 @@ func NewRequester(owner *ResponseHandler, handler *RequestHandler) IRequester {
 
 // 发送
 func (r *Requester) Send(msgName string, msgArgs interface{}) error {
+	// 相当于RequestHandler接收消息
 	return r.handler.Recv(nil, msgName, msgArgs)
 }
 
-// 请求
+// 请求，需要加上计时器处理超时
 func (r *Requester) Request(reqName string, arg interface{}) error {
 	if _, o := r.req2RespMap[reqName]; !o {
 		return fmt.Errorf("gproc: no request %s map to response", reqName)
 	}
+	// 相当于RequestHandler接收消息
 	return r.handler.Recv(r.owner, reqName, arg)
 }
 

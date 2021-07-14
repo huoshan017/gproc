@@ -27,11 +27,6 @@ func (h *Handler) IsClosed() bool {
 	return h.channel.closed
 }
 
-// 接收消息，实际等于Channel发送消息
-func (h *Handler) Recv(sender ISender, msgName string, msgArgs interface{}) error {
-	return h.channel.Send(sender, msgName, msgArgs)
-}
-
 // 请求消息处理器
 type RequestHandler struct {
 	Handler
@@ -56,6 +51,11 @@ func (h *RequestHandler) Init(createChannel bool) {
 // 注册
 func (h *RequestHandler) RegisterHandle(reqName string, handle func(ISender, interface{})) {
 	h.handleMap[reqName] = handle
+}
+
+// 接收消息，实际等于Channel发送消息
+func (h *RequestHandler) Recv(sender ISender, msgName string, msgArgs interface{}) error {
+	return h.channel.Send(sender, msgName, msgArgs)
 }
 
 // 处理接收的消息
@@ -111,7 +111,7 @@ func (r *ResponseHandler) AddRequester(req IRequester) {
 
 // 发送
 func (r *ResponseHandler) Send(msgName string, msgArgs interface{}) error {
-	return r.Handler.Recv(nil, msgName, msgArgs)
+	return r.channel.Send(nil, msgName, msgArgs)
 }
 
 // 更新处理IRequester的回调

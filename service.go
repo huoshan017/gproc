@@ -35,8 +35,8 @@ func (s *LocalService) Init() {
 
 // 关闭
 func (s *LocalService) Close() {
-	// 只要关闭其中一个处理器
 	s.RequestHandler.Close()
+	s.ResponseHandler.Close()
 }
 
 // 设置定时器处理
@@ -57,12 +57,13 @@ func (s *LocalService) Run() error {
 
 // 循环处理消息和定时器
 func (s *LocalService) runProcessMsgAndTick() error {
-	run := true
 	ticker := time.NewTicker(time.Duration(time.Millisecond * SERVICE_TICK_MS))
 	lastTime := time.Now()
+	channel := s.RequestHandler.channel
+	run := true
 	for run {
 		select {
-		case r, o := <-s.RequestHandler.channel.ch:
+		case r, o := <-channel.ch:
 			if !o {
 				return ErrClosed
 			}
@@ -72,7 +73,7 @@ func (s *LocalService) runProcessMsgAndTick() error {
 			tick := now.Sub(lastTime).Milliseconds()
 			s.tickHandle(int32(tick))
 			lastTime = now
-		case <-s.RequestHandler.channel.chClose:
+		case <-channel.chClose:
 			run = false
 		}
 	}
@@ -81,15 +82,16 @@ func (s *LocalService) runProcessMsgAndTick() error {
 
 // 循环处理请求
 func (s *LocalService) runProcessMsg() error {
+	channel := s.RequestHandler.channel
 	run := true
 	for run {
 		select {
-		case r, o := <-s.RequestHandler.channel.ch:
+		case r, o := <-channel.ch:
 			if !o {
 				return ErrClosed
 			}
 			s.processMsg(r)
-		case <-s.RequestHandler.channel.chClose:
+		case <-channel.chClose:
 			run = false
 		}
 	}
