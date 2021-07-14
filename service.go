@@ -12,39 +12,31 @@ const (
 )
 
 // 请求
-type req struct {
-	name string
-	args interface{}
-	peer IReceiver
+type msg struct {
+	name   string
+	args   interface{}
+	sender ISender
 }
 
-// 本地服务
+// 本地服务，处理Requester的请求，通知支持ResponseHandler
 type LocalService struct {
+	RequestHandler
 	ResponseHandler
-	chClose    chan struct{}
-	handleMap  map[string]func(peer IReceiver, args interface{})
 	tickHandle func(tick int32)
 }
 
 // 初始化
-func (s *LocalService) Init(reqLen int32) {
-	s.ResponseHandler.Init(reqLen)
-	s.chClose = make(chan struct{})
-	s.handleMap = make(map[string]func(IReceiver, interface{}))
+func (s *LocalService) Init() {
+	s.RequestHandler.Init(true)
+	s.ResponseHandler.Init(false)
+	// 绑定同一个Channel
+	s.ResponseHandler.BindChannel(s.RequestHandler.channel)
 }
 
 // 关闭
 func (s *LocalService) Close() {
-	if s.closed {
-		return
-	}
-	close(s.chClose)
-	s.closed = true
-}
-
-// 注册处理器
-func (s *LocalService) RegisterHandle(reqName string, h func(IReceiver, interface{})) {
-	s.handleMap[reqName] = h
+	// 只要关闭其中一个处理器
+	s.RequestHandler.Close()
 }
 
 // 设置定时器处理
@@ -56,31 +48,31 @@ func (s *LocalService) SetTickHandle(h func(tick int32)) {
 func (s *LocalService) Run() error {
 	var err error
 	if s.tickHandle != nil {
-		err = s.runProcessReqAndTick()
+		err = s.runProcessMsgAndTick()
 	} else {
-		err = s.runProcessReq()
+		err = s.runProcessMsg()
 	}
 	return err
 }
 
-// 循环处理请求和定时器
-func (s *LocalService) runProcessReqAndTick() error {
+// 循环处理消息和定时器
+func (s *LocalService) runProcessMsgAndTick() error {
 	run := true
 	ticker := time.NewTicker(time.Duration(time.Millisecond * SERVICE_TICK_MS))
 	lastTime := time.Now()
 	for run {
 		select {
-		case r, o := <-s.ch:
+		case r, o := <-s.RequestHandler.channel.ch:
 			if !o {
-				return errors.New("gproc: service already closed, break loop")
+				return ErrClosed
 			}
-			s.processReq(r)
+			s.processMsg(r)
 		case <-ticker.C:
 			now := time.Now()
 			tick := now.Sub(lastTime).Milliseconds()
 			s.tickHandle(int32(tick))
 			lastTime = now
-		case <-s.chClose:
+		case <-s.RequestHandler.channel.chClose:
 			run = false
 		}
 	}
@@ -88,42 +80,28 @@ func (s *LocalService) runProcessReqAndTick() error {
 }
 
 // 循环处理请求
-func (s *LocalService) runProcessReq() error {
+func (s *LocalService) runProcessMsg() error {
 	run := true
 	for run {
 		select {
-		case r, o := <-s.ch:
+		case r, o := <-s.RequestHandler.channel.ch:
 			if !o {
-				return errors.New("gproc: service already closed, break loop")
+				return ErrClosed
 			}
-			s.processReq(r)
-		case <-s.chClose:
+			s.processMsg(r)
+		case <-s.RequestHandler.channel.chClose:
 			run = false
 		}
 	}
 	return nil
 }
 
-// 处理请求或者返回的结果
-func (s *LocalService) processReq(r *req) {
+// 处理消息，包括请求和返回的结果
+func (s *LocalService) processMsg(r *msg) {
 	// 处理外部请求
-	if s.handle(r.peer, r.name, r.args) {
+	if s.RequestHandler.handleReq(r.sender, r.name, r.args) {
 		return
 	}
-	// 遍历内部IRequester处理请求后的回调
-	for k, _ := range s.requesterMap {
-		if k.handle(r.peer, r.name, r.args) {
-			break
-		}
-	}
-}
-
-// 处理单个IRequester请求后的回调
-func (s *LocalService) handle(peer IReceiver, reqName string, args interface{}) bool {
-	h, o := s.handleMap[reqName]
-	if !o {
-		return false
-	}
-	h(peer, args)
-	return true
+	// 遍历内部IRequester处理返回结果
+	s.ResponseHandler.handleResp(r)
 }

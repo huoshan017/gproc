@@ -1,7 +1,7 @@
 package gproc
 
 import (
-	"log"
+	//"log"
 	"math/rand"
 	"sync"
 	"testing"
@@ -56,7 +56,7 @@ func NewShopService() *ShopService {
 
 // 初始化
 func (s *ShopService) Init() {
-	s.LocalService.Init(0)
+	s.LocalService.Init()
 	s.itemList = make([]*ShopItem, 0)
 	s.RegisterHandle("getItemListReq", s.getItemList)
 	s.RegisterHandle("buyItemReq", s.buyItem)
@@ -86,7 +86,7 @@ func (s *ShopService) RemoveItem(instId int32, count int32) bool {
 }
 
 // 处理获取物品列表
-func (s *ShopService) getItemList(peer IReceiver, args interface{}) {
+func (s *ShopService) getItemList(sender ISender, args interface{}) {
 	resp := &GetItemListResp{}
 	for i := 0; i < len(s.itemList); i++ {
 		item := s.itemList[i]
@@ -97,16 +97,18 @@ func (s *ShopService) getItemList(peer IReceiver, args interface{}) {
 			price:  item.price,
 		})
 	}
-	peer.Receive(nil, "getItemListResp", resp)
+	sender.Send("getItemListResp", resp)
 }
 
 // 处理购买物品
-func (s *ShopService) buyItem(peer IReceiver, args interface{}) {
+func (s *ShopService) buyItem(sender ISender, args interface{}) {
 	resp := &BuyItemResp{}
 	req := args.(*BuyItemReq)
 	if req.instId <= 0 || req.count <= 0 {
-		resp.Err = -2
-		peer.Receive(nil, "buyItemResp", resp)
+		resp.Err = -99
+		resp.instId = req.instId
+		resp.count = req.count
+		sender.Send("buyItemResp", resp)
 		return
 	}
 
@@ -120,24 +122,24 @@ func (s *ShopService) buyItem(peer IReceiver, args interface{}) {
 	}
 	if foundItem == nil {
 		resp.Err = -1 // 没有该物品
-		log.Printf("not found item %v", req.instId)
+		//log.Printf("not found item %v", req.instId)
 	} else {
 		if foundItem.price*req.count > req.totalMoney {
 			resp.Err = -2
-			log.Printf("money %v not enough to buy item %v count %v, need money %v", req.totalMoney, foundItem.instId, req.count, foundItem.price*req.count)
+			//log.Printf("money %v not enough to buy item %v count %v, need money %v", req.totalMoney, foundItem.instId, req.count, foundItem.price*req.count)
 		} else if foundItem.count < req.count {
 			resp.Err = -3
-			log.Printf("item %v count %v not enough to buy, need %v", foundItem.instId, foundItem.count, req.count)
+			//log.Printf("item %v count %v not enough to buy, need %v", foundItem.instId, foundItem.count, req.count)
 		} else {
 			foundItem.count -= req.count
 			resp.instId = foundItem.instId
 			resp.id = foundItem.id
 			resp.count = foundItem.count
 			resp.costMoney = foundItem.price * req.count
-			log.Printf("bought item %v count %v, cost money %v", foundItem.instId, req.count, resp.costMoney)
+			//log.Printf("bought item %v count %v, cost money %v", foundItem.instId, req.count, resp.costMoney)
 		}
 	}
-	peer.Receive(nil, "buyItemRep", resp)
+	sender.Send("buyItemResp", resp)
 }
 
 // 定时器处理
@@ -168,26 +170,25 @@ type Player struct {
 // 创建玩家
 func NewPlayer(money int32) *Player {
 	p := &Player{money: money, itemList: make([]*Item, 0)}
-	p.Init(10)
-	log.Printf("player data: %v", *p)
+	p.Init(true)
 	return p
 }
 
 // 创建商店请求者
 func (p *Player) CreateShopRequester(shop *ShopService) {
-	p.shopRequester = NewRequester(p, shop)
+	p.shopRequester = NewRequester(&p.ResponseHandler, &shop.RequestHandler)
 }
 
 // 注册回调
 func (p *Player) RegisterResponseHandlers() {
-	p.shopRequester.RegisterCallback("getItemListResp", func(param interface{}) {
+	p.shopRequester.RegisterCallback("getItemListReq", "getItemListResp", func(param interface{}) {
 		//resp := param.(*GetItemListResp)
 		//log.Printf("get item list: %v", resp.itemList)
 	})
-	p.shopRequester.RegisterCallback("buyItemResp", func(param interface{}) {
+	p.shopRequester.RegisterCallback("buyItemReq", "buyItemResp", func(param interface{}) {
 		resp := param.(*BuyItemResp)
 		if resp.Err < 0 {
-			log.Printf("buy item failed, err %v", resp.Err)
+			//log.Printf("buy item %v failed, err %v, count %v", resp.instId, resp.Err, resp.count)
 			return
 		}
 		p.money -= resp.costMoney
@@ -204,7 +205,7 @@ func (p *Player) RegisterResponseHandlers() {
 		} else {
 			p.itemList = append(p.itemList, &Item{instId: resp.instId, id: resp.id, count: resp.count})
 		}
-		log.Printf("buy item %v count %v success, cost %v money", resp.instId, resp.count, resp.costMoney)
+		//log.Printf("buy item %v count %v success, cost %v money", resp.instId, resp.count, resp.costMoney)
 	})
 }
 
@@ -229,10 +230,10 @@ func (p *Player) Run(wg *sync.WaitGroup) {
 		} else {
 			itemIdList := []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21}
 			idx := rand.Int31n(int32(len(itemIdList)))
-			p.BuyItem(itemIdList[idx], rand.Int31n(10))
+			p.BuyItem(itemIdList[idx], rand.Int31n(10)+1)
 		}
 		p.Update()
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Microsecond * 10)
 	}
 }
 
@@ -266,7 +267,7 @@ func TestShopService(t *testing.T) {
 		shop.AddItem(itemList[i])
 	}
 
-	playerCount := 10000
+	playerCount := 100000
 	var wg sync.WaitGroup
 	wg.Add(playerCount)
 

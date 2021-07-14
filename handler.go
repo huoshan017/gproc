@@ -1,77 +1,140 @@
 package gproc
 
-import (
-	"errors"
-)
-
-const (
-	REQUEST_LIST_LENGTH = 100
-)
-
-// 处理器
+// 消息处理器
 type Handler struct {
-	ch           chan *req
-	closed       bool
-	requesterMap map[IRequester]struct{}
+	channel *Channel
 }
 
-// 回应处理器
-type ResponseHandler struct {
-	Handler
-}
-
-// 初始化
-func (h *Handler) Init(reqLen int32) {
-	if reqLen <= 0 {
-		reqLen = REQUEST_LIST_LENGTH
+// 创建消息处理器
+func (h *Handler) Init(createChannel bool) {
+	if createChannel {
+		h.channel = NewChannel(0)
 	}
-	h.ch = make(chan *req, reqLen)
-	h.requesterMap = make(map[IRequester]struct{})
 }
 
 // 关闭
 func (h *Handler) Close() {
-	if h.closed {
-		return
+	h.channel.Close()
+}
+
+// 绑定Channel
+func (h *Handler) BindChannel(channel *Channel) {
+	h.channel = channel
+}
+
+// 是否关闭
+func (h *Handler) IsClosed() bool {
+	return h.channel.closed
+}
+
+// 接收消息，实际等于Channel发送消息
+func (h *Handler) Recv(sender ISender, msgName string, msgArgs interface{}) error {
+	return h.channel.Send(sender, msgName, msgArgs)
+}
+
+// 请求消息处理器
+type RequestHandler struct {
+	Handler
+	handleMap map[string]func(sender ISender, args interface{})
+}
+
+// 创建RequestHandler
+func NewRequestHandler(createChannel bool) *RequestHandler {
+	handler := &RequestHandler{}
+	handler.Init(createChannel)
+	return handler
+}
+
+// 初始化
+func (h *RequestHandler) Init(createChannel bool) {
+	if createChannel {
+		h.channel = NewChannel(CHANNEL_LENGTH)
 	}
-	close(h.ch)
-	h.closed = true
+	h.handleMap = make(map[string]func(sender ISender, args interface{}))
+}
+
+// 注册
+func (h *RequestHandler) RegisterHandle(reqName string, handle func(ISender, interface{})) {
+	h.handleMap[reqName] = handle
+}
+
+// 处理接收的消息
+func (h *RequestHandler) Update() error {
+	if h.channel.closed {
+		return ErrClosed
+	}
+	m, err := h.channel.Recv()
+	if err != nil {
+		return err
+	}
+	if m != nil {
+		h.handleReq(m.sender, m.name, m.args)
+	}
+	return nil
+}
+
+// 处理单个IRequester请求后的回调
+func (h *RequestHandler) handleReq(sender ISender, reqName string, args interface{}) bool {
+	handle, o := h.handleMap[reqName]
+	if !o {
+		return false
+	}
+	handle(sender, args)
+	return true
+}
+
+// 返回消息处理器
+type ResponseHandler struct {
+	Handler
+	requesterMap map[IRequester]struct{}
+}
+
+// 创建ResponseHandler
+func NewResponseHandler(createChannel bool) *ResponseHandler {
+	handler := &ResponseHandler{}
+	handler.Init(createChannel)
+	return handler
+}
+
+// 初始化
+func (h *ResponseHandler) Init(createChannel bool) {
+	if createChannel {
+		h.channel = NewChannel(CHANNEL_LENGTH)
+	}
+	h.requesterMap = make(map[IRequester]struct{})
 }
 
 // 添加请求者
-func (h *Handler) AddRequester(r IRequester) {
-	h.requesterMap[r] = struct{}{}
+func (r *ResponseHandler) AddRequester(req IRequester) {
+	r.requesterMap[req] = struct{}{}
 }
 
-// 接收请求
-func (h *Handler) Receive(peer IReceiver, reqName string, args interface{}) error {
-	// 已关闭，防止重复close造成panic
-	if h.closed {
-		return ErrClosed
-	}
-	// 请求写入
-	h.ch <- &req{
-		name: reqName,
-		args: args,
-		peer: peer,
-	}
-	return nil
+// 发送
+func (r *ResponseHandler) Send(msgName string, msgArgs interface{}) error {
+	return r.Handler.Recv(nil, msgName, msgArgs)
 }
 
 // 更新处理IRequester的回调
-func (h *Handler) Update() error {
-	select {
-	case r, o := <-h.ch:
-		if !o {
-			return errors.New("gproc: handler already closed, break loop")
-		}
-		// 处理请求
-		for k, _ := range h.requesterMap {
-			if k.handle(r.peer, r.name, r.args) {
-				break
-			}
-		}
-	default:
+func (r *ResponseHandler) Update() error {
+	if r.channel.closed {
+		return ErrClosed
+	}
+	resp, err := r.channel.Recv()
+	if err != nil {
+		return err
+	}
+	// 处理请求
+	if resp != nil {
+		r.handleResp(resp)
 	}
 	return nil
+}
+
+// 处理返回
+func (r *ResponseHandler) handleResp(resp *msg) {
+	for k, _ := range r.requesterMap {
+		if k.Handle(resp.name, resp.args) {
+			break
+		}
+	}
 }
