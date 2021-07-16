@@ -11,7 +11,7 @@ const (
 	SERVICE_TICK_MS = 10 // 定时器间隔
 )
 
-// 请求
+// 消息
 type msg struct {
 	name   string
 	args   interface{}
@@ -27,12 +27,29 @@ type LocalService struct {
 	tick            int32
 }
 
+// 创建本地服务
+func NewLocalService(chanLen int32) *LocalService {
+	service := &LocalService{}
+	service.Init(chanLen)
+	return service
+}
+
+// 创建默认本地服务
+func NewDefaultLocalService() *LocalService {
+	return NewLocalService(CHANNEL_LENGTH)
+}
+
 // 初始化
 func (s *LocalService) Init(chanLen int32) {
 	s.handler = &Handler{}
 	s.handler.Init(chanLen)
 	s.requestHandler = NewRequestHandler(s.handler)
 	s.responseHandler = NewResponseHandler(s.handler)
+}
+
+// 默认初始化
+func (s *LocalService) InitDefault() {
+	s.Init(CHANNEL_LENGTH)
 }
 
 // 关闭
@@ -55,7 +72,7 @@ func (s *LocalService) RegisterHandle(reqName string, handle func(ISender, inter
 	s.requestHandler.RegisterHandle(reqName, handle)
 }
 
-// 接收请求
+// 接收消息
 func (s *LocalService) Recv(sender ISender, msgName string, msgArgs interface{}) error {
 	return s.requestHandler.Recv(sender, msgName, msgArgs)
 }
