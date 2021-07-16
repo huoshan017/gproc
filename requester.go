@@ -8,20 +8,20 @@ import (
 // 一般跟IRequestHandler不在同一个goroutine
 type Requester struct {
 	owner       IResponseHandler // Requester的持有者
-	handler     IRequestHandler  // Requester请求的接收者
+	receiver    IRequestHandler  // Requester请求的接收者
 	req2RespMap map[string]string
 	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为callbackMap初始化时还未开始执行handle
 	options     RequestOptions
 }
 
 // 创建请求者
-func NewRequester(owner IResponseHandler, handler IRequestHandler, options ...RequestOption) IRequester {
-	if owner == nil || handler == nil {
+func NewRequester(owner IResponseHandler, receiver IRequestHandler, options ...RequestOption) IRequester {
+	if owner == nil || receiver == nil {
 		panic("owner or receiver is nil")
 	}
 	req := &Requester{
 		owner:       owner,
-		handler:     handler,
+		receiver:    receiver,
 		req2RespMap: make(map[string]string),
 		callbackMap: make(map[string]func(interface{})),
 	}
@@ -35,7 +35,7 @@ func NewRequester(owner IResponseHandler, handler IRequestHandler, options ...Re
 // 发送
 func (r *Requester) Send(msgName string, msgArgs interface{}) error {
 	// 相当于RequestHandler接收消息
-	return r.handler.Recv(nil, msgName, msgArgs)
+	return r.receiver.Recv(nil, msgName, msgArgs)
 }
 
 // 请求，需要加上计时器处理超时（计时器用时间堆来实现）
@@ -44,7 +44,7 @@ func (r *Requester) Request(reqName string, arg interface{}) error {
 		return fmt.Errorf("gproc: no request %s map to response", reqName)
 	}
 	// 相当于RequestHandler接收消息
-	err := r.handler.Recv(r.owner, reqName, arg)
+	err := r.receiver.Recv(r.owner, reqName, arg)
 	return err
 }
 

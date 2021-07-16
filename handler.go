@@ -1,51 +1,99 @@
 package gproc
 
+const (
+	CHANNEL_LENGTH = 100
+)
+
 // 消息处理器
 type Handler struct {
-	channel *Channel
+	ch      chan *msg
+	closed  bool
+	chClose chan struct{}
+}
+
+// 新的处理器
+func NewHandler(chanLen int32) *Handler {
+	h := &Handler{}
+	h.Init(chanLen)
+	return h
+}
+
+// 新的默认处理器
+func NewDefaultHandler() *Handler {
+	return NewHandler(0)
 }
 
 // 创建消息处理器
-func (h *Handler) Init(createChannel bool) {
-	if createChannel {
-		h.channel = NewChannel(CHANNEL_LENGTH)
+func (h *Handler) Init(chanLen int32) {
+	if chanLen <= 0 {
+		chanLen = CHANNEL_LENGTH
 	}
+	h.ch = make(chan *msg, chanLen)
+	h.chClose = make(chan struct{})
 }
 
 // 关闭
 func (h *Handler) Close() {
-	h.channel.Close()
-}
-
-// 绑定Channel
-func (h *Handler) BindChannel(channel *Channel) {
-	h.channel = channel
+	if h.closed {
+		return
+	}
+	close(h.chClose)
+	h.closed = true
 }
 
 // 是否关闭
 func (h *Handler) IsClosed() bool {
-	return h.channel.closed
+	return h.closed
+}
+
+// 内部发送函数
+func (h *Handler) Send(sender ISender, reqName string, args interface{}) error {
+	// 已关闭，防止重复close造成panic
+	if h.closed {
+		return ErrClosed
+	}
+	// 请求写入
+	m := &msg{
+		name:   reqName,
+		args:   args,
+		sender: sender,
+	}
+	h.ch <- m
+	return nil
 }
 
 // 请求消息处理器
 type RequestHandler struct {
-	Handler
+	handler   *Handler
 	handleMap map[string]func(sender ISender, args interface{})
 }
 
 // 创建RequestHandler
-func NewRequestHandler(createChannel bool) *RequestHandler {
-	handler := &RequestHandler{}
-	handler.Init(createChannel)
-	return handler
+func NewRequestHandler(handler *Handler) *RequestHandler {
+	h := &RequestHandler{}
+	h.Init(handler)
+	return h
+}
+
+// 创建默认的请求处理器
+func NewDefaultRequestHandler() *RequestHandler {
+	return NewRequestHandler(NewDefaultHandler())
 }
 
 // 初始化
-func (h *RequestHandler) Init(createChannel bool) {
-	if createChannel {
-		h.channel = NewChannel(CHANNEL_LENGTH)
-	}
+func (h *RequestHandler) Init(handler *Handler) {
+	h.handler = handler
 	h.handleMap = make(map[string]func(sender ISender, args interface{}))
+}
+
+// 默认初始化
+func (h *RequestHandler) InitDefault() {
+	h.Init(NewDefaultHandler())
+}
+
+// 关闭
+func (h *RequestHandler) Close() {
+	h.handler.Close()
 }
 
 // 注册
@@ -55,20 +103,28 @@ func (h *RequestHandler) RegisterHandle(reqName string, handle func(ISender, int
 
 // 接收消息，实际等于Channel发送消息
 func (h *RequestHandler) Recv(sender ISender, msgName string, msgArgs interface{}) error {
-	return h.channel.Send(sender, msgName, msgArgs)
+	return h.handler.Send(sender, msgName, msgArgs)
 }
 
 // 处理接收的消息
 func (h *RequestHandler) Update() error {
-	if h.channel.closed {
+	if h.handler.closed {
 		return ErrClosed
 	}
-	m, err := h.channel.Recv()
-	if err != nil {
-		return err
-	}
-	if m != nil {
-		h.handleReq(m.sender, m.name, m.args)
+	loop := true
+	for loop {
+		select {
+		case m, o := <-h.handler.ch:
+			if !o {
+				return ErrClosed
+			}
+			h.handleReq(m.sender, m.name, m.args)
+		case <-h.handler.chClose:
+			h.handler.closed = true
+			loop = false
+		default:
+			loop = false
+		}
 	}
 	return nil
 }
@@ -85,47 +141,67 @@ func (h *RequestHandler) handleReq(sender ISender, reqName string, args interfac
 
 // 返回消息处理器
 type ResponseHandler struct {
-	Handler
+	handler      *Handler
 	requesterMap map[IRequester]struct{}
 }
 
-// 创建ResponseHandler
-func NewResponseHandler(createChannel bool) *ResponseHandler {
-	handler := &ResponseHandler{}
-	handler.Init(createChannel)
-	return handler
+// 创建返回Handler
+func NewResponseHandler(handler *Handler) *ResponseHandler {
+	h := &ResponseHandler{}
+	h.Init(handler)
+	return h
+}
+
+// 创建默认返回处理器
+func NewDefaultResponseHandler() *ResponseHandler {
+	return NewResponseHandler(NewDefaultHandler())
 }
 
 // 初始化
-func (h *ResponseHandler) Init(createChannel bool) {
-	if createChannel {
-		h.channel = NewChannel(CHANNEL_LENGTH)
-	}
+func (h *ResponseHandler) Init(handler *Handler) {
+	h.handler = handler
 	h.requesterMap = make(map[IRequester]struct{})
 }
 
+// 默认初始化
+func (h *ResponseHandler) InitDefault() {
+	h.Init(NewDefaultHandler())
+}
+
+// 关闭
+func (h *ResponseHandler) Close() {
+	h.handler.Close()
+}
+
 // 添加请求者
-func (r *ResponseHandler) AddRequester(req IRequester) {
-	r.requesterMap[req] = struct{}{}
+func (h *ResponseHandler) AddRequester(req IRequester) {
+	h.requesterMap[req] = struct{}{}
 }
 
 // 发送
-func (r *ResponseHandler) Send(msgName string, msgArgs interface{}) error {
-	return r.channel.Send(nil, msgName, msgArgs)
+func (h *ResponseHandler) Send(msgName string, msgArgs interface{}) error {
+	return h.handler.Send(nil, msgName, msgArgs)
 }
 
 // 更新处理IRequester的回调
-func (r *ResponseHandler) Update() error {
-	if r.channel.closed {
+func (h *ResponseHandler) Update() error {
+	if h.handler.closed {
 		return ErrClosed
 	}
-	resp, err := r.channel.Recv()
-	if err != nil {
-		return err
-	}
-	// 处理请求
-	if resp != nil {
-		r.handleResp(resp)
+	loop := true
+	for loop {
+		select {
+		case m, o := <-h.handler.ch:
+			if !o {
+				return ErrClosed
+			}
+			h.handleResp(m)
+		case <-h.handler.chClose:
+			h.handler.closed = true
+			loop = false
+		default:
+			loop = false
+		}
 	}
 	return nil
 }
