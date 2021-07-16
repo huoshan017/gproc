@@ -1,28 +1,34 @@
 package gproc
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // 请求者，发起请求到IReceiver，除创建初始化外整个生命周期在同一个goroutine中
-// 一般跟IReceiver不在同一个goroutine
+// 一般跟IRequestHandler不在同一个goroutine
 type Requester struct {
-	owner       IResponseHandler
-	handler     IRequestHandler
+	owner       IResponseHandler // Requester的持有者
+	handler     IRequestHandler  // Requester请求的接收者
 	req2RespMap map[string]string
 	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为callbackMap初始化时还未开始执行handle
+	options     RequestOptions
 }
 
 // 创建请求者
-func NewRequester(owner IResponseHandler, handler IRequestHandler) IRequester {
+func NewRequester(owner IResponseHandler, handler IRequestHandler, options ...RequestOption) IRequester {
 	if owner == nil || handler == nil {
 		panic("owner or receiver is nil")
 	}
 	req := &Requester{
-		req2RespMap: make(map[string]string),
-		callbackMap: make(map[string]func(interface{})),
 		owner:       owner,
 		handler:     handler,
+		req2RespMap: make(map[string]string),
+		callbackMap: make(map[string]func(interface{})),
 	}
 	owner.AddRequester(req)
+	for _, option := range options {
+		option(req.options)
+	}
 	return req
 }
 
@@ -32,13 +38,14 @@ func (r *Requester) Send(msgName string, msgArgs interface{}) error {
 	return r.handler.Recv(nil, msgName, msgArgs)
 }
 
-// 请求，需要加上计时器处理超时
+// 请求，需要加上计时器处理超时（计时器用时间堆来实现）
 func (r *Requester) Request(reqName string, arg interface{}) error {
 	if _, o := r.req2RespMap[reqName]; !o {
 		return fmt.Errorf("gproc: no request %s map to response", reqName)
 	}
 	// 相当于RequestHandler接收消息
-	return r.handler.Recv(r.owner, reqName, arg)
+	err := r.handler.Recv(r.owner, reqName, arg)
+	return err
 }
 
 // 注册回调
@@ -58,7 +65,7 @@ func (r *Requester) RequestWithCallback(reqName string, arg interface{}, respNam
 }
 
 // 处理回调
-func (r *Requester) Handle(respName string, arg interface{}) bool {
+func (r *Requester) handle(respName string, arg interface{}) bool {
 	callback, o := r.callbackMap[respName]
 	if !o {
 		return false

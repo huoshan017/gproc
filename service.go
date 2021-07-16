@@ -23,6 +23,7 @@ type LocalService struct {
 	RequestHandler
 	ResponseHandler
 	tickHandle func(tick int32)
+	tick       int32
 }
 
 // 初始化
@@ -40,8 +41,12 @@ func (s *LocalService) Close() {
 }
 
 // 设置定时器处理
-func (s *LocalService) SetTickHandle(h func(tick int32)) {
+func (s *LocalService) SetTickHandle(h func(tick int32), tick int32) {
 	s.tickHandle = h
+	if tick <= 0 {
+		tick = SERVICE_TICK_MS
+	}
+	s.tick = tick
 }
 
 // 循环处理请求
@@ -57,7 +62,7 @@ func (s *LocalService) Run() error {
 
 // 循环处理消息和定时器
 func (s *LocalService) runProcessMsgAndTick() error {
-	ticker := time.NewTicker(time.Duration(time.Millisecond * SERVICE_TICK_MS))
+	ticker := time.NewTicker(time.Duration(time.Millisecond * time.Duration(s.tick)))
 	lastTime := time.Now()
 	channel := s.RequestHandler.channel
 	run := true

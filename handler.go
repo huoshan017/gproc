@@ -133,7 +133,7 @@ func (r *ResponseHandler) Update() error {
 // 处理返回
 func (r *ResponseHandler) handleResp(resp *msg) {
 	for k, _ := range r.requesterMap {
-		if k.Handle(resp.name, resp.args) {
+		if k.handle(resp.name, resp.args) {
 			break
 		}
 	}

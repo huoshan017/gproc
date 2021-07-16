@@ -60,7 +60,7 @@ func (s *ShopService) Init() {
 	s.itemList = make([]*ShopItem, 0)
 	s.RegisterHandle("getItemListReq", s.getItemList)
 	s.RegisterHandle("buyItemReq", s.buyItem)
-	s.SetTickHandle(s.tick)
+	s.SetTickHandle(s.tick, 1)
 }
 
 // 添加物品

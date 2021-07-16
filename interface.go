@@ -9,7 +9,7 @@ type ISender interface {
 type IRequester interface {
 	Request(reqName string, arg interface{}) error
 	RegisterCallback(reqName string, respName string, callback func(interface{}))
-	Handle(respName string, arg interface{}) bool
+	handle(respName string, arg interface{}) bool
 }
 
 // 请求消息处理器
