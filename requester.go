@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// 请求者，发起请求到IReceiver，除创建初始化外整个生命周期在同一个goroutine中
+// 请求者，发起请求到IRequesterHandler，除创建初始化外整个生命周期在同一个goroutine中
 // 一般跟IRequestHandler不在同一个goroutine
 type Requester struct {
 	owner       IResponseHandler // Requester的持有者
