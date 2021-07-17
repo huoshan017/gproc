@@ -18,7 +18,7 @@ type msg struct {
 	sender ISender
 }
 
-// 本地服务，处理Requester的请求，通知支持ResponseHandler
+// 本地服务，处理Requester的请求，返回ResponseHandler
 type LocalService struct {
 	handler         *Handler
 	requestHandler  *RequestHandler
