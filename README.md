@@ -1,2 +1,2 @@
 # gproc
-gproc是完全异步的基于goroutine处理的actor组件
+gproc是完全异步的基于goroutine的actor模式组件
