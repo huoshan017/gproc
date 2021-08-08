@@ -143,7 +143,7 @@ func (s *ShopService) buyItem(sender ISender, args interface{}) {
 }
 
 // 定时器处理
-func (s *ShopService) tick(tick int32) {
+func (s *ShopService) tick(tick time.Duration) {
 	// 价格随时间变化
 	for i := 0; i < len(s.itemList); i++ {
 		item := s.itemList[i]
