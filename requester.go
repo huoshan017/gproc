@@ -38,7 +38,7 @@ func (r *Requester) Send(msgName string, msgArgs interface{}) error {
 	return r.receiver.Recv(nil, msgName, msgArgs)
 }
 
-// 请求，需要加上计时器处理超时（计时器用时间堆来实现）
+// 请求
 func (r *Requester) Request(reqName string, arg interface{}) error {
 	if _, o := r.req2RespMap[reqName]; !o {
 		return fmt.Errorf("gproc: no request %s map to response", reqName)
@@ -58,8 +58,7 @@ func (r *Requester) RegisterCallback(reqName string, respName string, callback f
 func (r *Requester) RequestWithCallback(reqName string, arg interface{}, respName string, callback func(interface{})) error {
 	err := r.Request(reqName, arg)
 	if err == nil {
-		r.req2RespMap[reqName] = respName
-		r.callbackMap[respName] = callback
+		r.RegisterCallback(reqName, respName, callback)
 	}
 	return err
 }

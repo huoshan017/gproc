@@ -5,26 +5,26 @@ const (
 )
 
 // 消息处理器
-type Handler struct {
+type handler struct {
 	ch      chan *msg
 	closed  bool
 	chClose chan struct{}
 }
 
 // 新的处理器
-func NewHandler(chanLen int32) *Handler {
-	h := &Handler{}
+func newHandler(chanLen int32) *handler {
+	h := &handler{}
 	h.Init(chanLen)
 	return h
 }
 
 // 新的默认处理器
-func NewDefaultHandler() *Handler {
-	return NewHandler(0)
+func newDefaultHandler() *handler {
+	return newHandler(0)
 }
 
 // 创建消息处理器
-func (h *Handler) Init(chanLen int32) {
+func (h *handler) Init(chanLen int32) {
 	if chanLen <= 0 {
 		chanLen = CHANNEL_LENGTH
 	}
@@ -33,7 +33,7 @@ func (h *Handler) Init(chanLen int32) {
 }
 
 // 关闭
-func (h *Handler) Close() {
+func (h *handler) Close() {
 	if h.closed {
 		return
 	}
@@ -42,12 +42,12 @@ func (h *Handler) Close() {
 }
 
 // 是否关闭
-func (h *Handler) IsClosed() bool {
+func (h *handler) IsClosed() bool {
 	return h.closed
 }
 
 // 内部发送函数
-func (h *Handler) Send(sender ISender, reqName string, args interface{}) error {
+func (h *handler) Send(sender ISender, reqName string, args interface{}) error {
 	// 已关闭，防止重复close造成panic
 	if h.closed {
 		return ErrClosed
@@ -64,12 +64,12 @@ func (h *Handler) Send(sender ISender, reqName string, args interface{}) error {
 
 // 请求消息处理器
 type RequestHandler struct {
-	handler   *Handler
+	handler   *handler
 	handleMap map[string]func(sender ISender, args interface{})
 }
 
 // 创建RequestHandler
-func NewRequestHandler(handler *Handler) *RequestHandler {
+func NewRequestHandler(handler *handler) *RequestHandler {
 	h := &RequestHandler{}
 	h.Init(handler)
 	return h
@@ -77,18 +77,18 @@ func NewRequestHandler(handler *Handler) *RequestHandler {
 
 // 创建默认的请求处理器
 func NewDefaultRequestHandler() *RequestHandler {
-	return NewRequestHandler(NewDefaultHandler())
+	return NewRequestHandler(newDefaultHandler())
 }
 
 // 初始化
-func (h *RequestHandler) Init(handler *Handler) {
+func (h *RequestHandler) Init(handler *handler) {
 	h.handler = handler
 	h.handleMap = make(map[string]func(sender ISender, args interface{}))
 }
 
 // 默认初始化
 func (h *RequestHandler) InitDefault() {
-	h.Init(NewDefaultHandler())
+	h.Init(newDefaultHandler())
 }
 
 // 关闭
@@ -107,7 +107,7 @@ func (h *RequestHandler) Recv(sender ISender, msgName string, msgArgs interface{
 }
 
 // 处理接收的消息
-func (h *RequestHandler) Update() error {
+func (h *RequestHandler) Run() error {
 	if h.handler.closed {
 		return ErrClosed
 	}
@@ -141,12 +141,12 @@ func (h *RequestHandler) handleReq(sender ISender, reqName string, args interfac
 
 // 返回消息处理器
 type ResponseHandler struct {
-	handler      *Handler
+	handler      *handler
 	requesterMap map[IRequester]struct{}
 }
 
 // 创建返回Handler
-func NewResponseHandler(handler *Handler) *ResponseHandler {
+func NewResponseHandler(handler *handler) *ResponseHandler {
 	h := &ResponseHandler{}
 	h.Init(handler)
 	return h
@@ -154,18 +154,18 @@ func NewResponseHandler(handler *Handler) *ResponseHandler {
 
 // 创建默认返回处理器
 func NewDefaultResponseHandler() *ResponseHandler {
-	return NewResponseHandler(NewDefaultHandler())
+	return NewResponseHandler(newDefaultHandler())
 }
 
 // 初始化
-func (h *ResponseHandler) Init(handler *Handler) {
+func (h *ResponseHandler) Init(handler *handler) {
 	h.handler = handler
 	h.requesterMap = make(map[IRequester]struct{})
 }
 
 // 默认初始化
 func (h *ResponseHandler) InitDefault() {
-	h.Init(NewDefaultHandler())
+	h.Init(newDefaultHandler())
 }
 
 // 关闭

@@ -16,10 +16,12 @@ type IRequester interface {
 type IRequestHandler interface {
 	RegisterHandle(reqName string, handle func(ISender, interface{}))
 	Recv(sender ISender, msgName string, msgArgs interface{}) error
+	Run() error
 }
 
 // 返回消息处理器
 type IResponseHandler interface {
 	ISender
 	AddRequester(req IRequester)
+	Update() error
 }

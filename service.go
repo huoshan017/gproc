@@ -20,7 +20,7 @@ type msg struct {
 
 // 本地服务，处理Requester的请求，返回ResponseHandler
 type LocalService struct {
-	handler         *Handler
+	handler         *handler
 	requestHandler  *RequestHandler
 	responseHandler *ResponseHandler
 	tickHandle      func(tick int32)
@@ -41,7 +41,7 @@ func NewDefaultLocalService() *LocalService {
 
 // 初始化
 func (s *LocalService) Init(chanLen int32) {
-	s.handler = &Handler{}
+	s.handler = &handler{}
 	s.handler.Init(chanLen)
 	s.requestHandler = NewRequestHandler(s.handler)
 	s.responseHandler = NewResponseHandler(s.handler)

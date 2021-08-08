@@ -170,7 +170,7 @@ type Player struct {
 // 创建玩家
 func NewPlayer(money int32) *Player {
 	p := &Player{money: money, itemList: make([]*Item, 0)}
-	p.Init(NewDefaultHandler())
+	p.InitDefault()
 	return p
 }
 
