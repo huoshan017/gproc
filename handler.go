@@ -208,7 +208,7 @@ func (h *ResponseHandler) Update() error {
 
 // 处理返回
 func (r *ResponseHandler) handleResp(resp *msg) {
-	for k, _ := range r.requesterMap {
+	for k := range r.requesterMap {
 		if k.handle(resp.name, resp.args) {
 			break
 		}
