@@ -1,4 +1,4 @@
-t package gproc
+package gproc
 
 import (
 	//"log"
