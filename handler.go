@@ -168,11 +168,7 @@ func (h *ResponseHandler) InitDefault() {
 
 // 关闭
 func (h *ResponseHandler) Close() {
-	if h.handler.closed {
-		return
-	}
 	h.handler.Close()
-	h.handler.closed = true
 }
 
 // 添加请求者
