@@ -26,12 +26,6 @@ func NewRequester(owner IResponseHandler, receiver IRequestHandler, options ...R
 	return req
 }
 
-// 发送
-func (r *Requester) Send(msgName string, msgArgs interface{}) error {
-	// 相当于RequestHandler接收消息
-	return r.receiver.Recv(nil, msgName, msgArgs)
-}
-
 // 请求
 func (r *Requester) Request(msgName string, arg interface{}) error {
 	// 相当于RequestHandler接收消息

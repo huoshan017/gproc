@@ -11,13 +11,6 @@ const (
 	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
 )
 
-// 消息
-type msg struct {
-	name   string
-	args   interface{}
-	sender ISender
-}
-
 // 本地服务，处理Requester的请求，返回ResponseHandler
 type LocalService struct {
 	handler         *handler

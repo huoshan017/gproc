@@ -4,6 +4,14 @@ const (
 	CHANNEL_LENGTH = 100
 )
 
+// 消息
+type msg struct {
+	typ    uint8
+	name   string
+	args   interface{}
+	sender ISender
+}
+
 // 消息处理器
 type handler struct {
 	ch      chan *msg
