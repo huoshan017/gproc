@@ -7,14 +7,14 @@ type ISender interface {
 
 // 请求者接口
 type IRequester interface {
-	Request(reqName string, arg interface{}) error
-	RegisterCallback(reqName string, respName string, callback func(interface{}))
-	handle(respName string, arg interface{}) bool
+	Request(msgName string, arg interface{}) error
+	RegisterCallback(msgName string, callback func(interface{}))
+	handle(msgName string, arg interface{}) bool
 }
 
 // 请求消息处理器
 type IRequestHandler interface {
-	RegisterHandle(reqName string, handle func(ISender, interface{}))
+	RegisterHandle(msgName string, handle func(ISender, interface{}))
 	Recv(sender ISender, msgName string, msgArgs interface{}) error
 	Run() error
 }
@@ -22,6 +22,6 @@ type IRequestHandler interface {
 // 返回消息处理器
 type IResponseHandler interface {
 	ISender
-	AddRequester(req IRequester)
+	addRequester(req IRequester)
 	Update() error
 }

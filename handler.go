@@ -172,7 +172,7 @@ func (h *ResponseHandler) Close() {
 }
 
 // 添加请求者
-func (h *ResponseHandler) AddRequester(req IRequester) {
+func (h *ResponseHandler) addRequester(req IRequester) {
 	h.requesterMap[req] = struct{}{}
 }
 

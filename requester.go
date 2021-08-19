@@ -1,15 +1,10 @@
 package gproc
 
-import (
-	"fmt"
-)
-
 // 请求者，发起请求到IRequesterHandler，除创建初始化外整个生命周期在同一个goroutine中
 // 一般跟IRequestHandler不在同一个goroutine
 type Requester struct {
-	owner       IResponseHandler // Requester的持有者
-	receiver    IRequestHandler  // Requester请求的接收者
-	req2RespMap map[string]string
+	owner       IResponseHandler             // Requester的持有者
+	receiver    IRequestHandler              // Requester请求的接收者
 	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为callbackMap初始化时还未开始执行handle
 	options     RequestOptions
 }
@@ -22,10 +17,9 @@ func NewRequester(owner IResponseHandler, receiver IRequestHandler, options ...R
 	req := &Requester{
 		owner:       owner,
 		receiver:    receiver,
-		req2RespMap: make(map[string]string),
 		callbackMap: make(map[string]func(interface{})),
 	}
-	owner.AddRequester(req)
+	owner.addRequester(req)
 	for _, option := range options {
 		option(req.options)
 	}
@@ -39,28 +33,21 @@ func (r *Requester) Send(msgName string, msgArgs interface{}) error {
 }
 
 // 请求
-func (r *Requester) Request(reqName string, arg interface{}) error {
-	if _, o := r.req2RespMap[reqName]; !o {
-		return fmt.Errorf("gproc: no request %s map to response", reqName)
-	}
+func (r *Requester) Request(msgName string, arg interface{}) error {
 	// 相当于RequestHandler接收消息
-	err := r.receiver.Recv(r.owner, reqName, arg)
+	err := r.receiver.Recv(r.owner, msgName, arg)
 	return err
 }
 
 // 注册回调
-func (r *Requester) RegisterCallback(reqName string, respName string, callback func(interface{})) {
-	r.req2RespMap[reqName] = respName
-	r.callbackMap[respName] = callback
+func (r *Requester) RegisterCallback(msgName string, callback func(interface{})) {
+	r.callbackMap[msgName] = callback
 }
 
 // 请求带回调，这个方法肯定在handle函数同一goroutine中使用，不存在callbackMap线程安全问题
-func (r *Requester) RequestWithCallback(reqName string, arg interface{}, respName string, callback func(interface{})) error {
-	err := r.Request(reqName, arg)
-	if err == nil {
-		r.RegisterCallback(reqName, respName, callback)
-	}
-	return err
+func (r *Requester) RequestWithCallback(msgName string, arg interface{}, callback func(interface{})) error {
+	r.RegisterCallback(msgName, callback)
+	return r.Request(msgName, arg)
 }
 
 // 处理回调

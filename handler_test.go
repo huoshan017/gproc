@@ -25,8 +25,8 @@ func NewShopHandler() *ShopHandler {
 func (s *ShopHandler) Init() {
 	s.InitDefault()
 	s.itemList = make([]*ShopItem, 0)
-	s.RegisterHandle("getItemListReq", s.getItemList)
-	s.RegisterHandle("buyItemReq", s.buyItem)
+	s.RegisterHandle("getItemList", s.getItemList)
+	s.RegisterHandle("buyItem", s.buyItem)
 }
 
 // 添加物品
@@ -63,7 +63,7 @@ func (s *ShopHandler) getItemList(sender ISender, args interface{}) {
 			price:  item.price,
 		})
 	}
-	sender.Send("getItemListResp", resp)
+	sender.Send("getItemList", resp)
 }
 
 // 处理购买物品
@@ -74,7 +74,7 @@ func (s *ShopHandler) buyItem(sender ISender, args interface{}) {
 		resp.Err = -99
 		resp.instId = req.instId
 		resp.count = req.count
-		sender.Send("buyItemResp", resp)
+		sender.Send("buyItem", resp)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (s *ShopHandler) buyItem(sender ISender, args interface{}) {
 			//log.Printf("bought item %v count %v, cost money %v", foundItem.instId, req.count, resp.costMoney)
 		}
 	}
-	sender.Send("buyItemResp", resp)
+	sender.Send("buyItem", resp)
 }
 
 /*
@@ -143,11 +143,11 @@ func (p *PlayerRequester) CreateShopRequester(shop *ShopHandler) {
 
 // 注册回调
 func (p *PlayerRequester) RegisterResponseHandlers() {
-	p.shopRequester.RegisterCallback("getItemListReq", "getItemListResp", func(param interface{}) {
+	p.shopRequester.RegisterCallback("getItemList", func(param interface{}) {
 		//resp := param.(*GetItemListResp)
 		//log.Printf("get item list: %v", resp.itemList)
 	})
-	p.shopRequester.RegisterCallback("buyItemReq", "buyItemResp", func(param interface{}) {
+	p.shopRequester.RegisterCallback("buyItem", func(param interface{}) {
 		resp := param.(*BuyItemResp)
 		if resp.Err < 0 {
 			//log.Printf("buy item %v failed, err %v, count %v", resp.instId, resp.Err, resp.count)
@@ -173,12 +173,12 @@ func (p *PlayerRequester) RegisterResponseHandlers() {
 
 // 获得物品列表
 func (p *PlayerRequester) GetItemList() {
-	p.shopRequester.Request("getItemListReq", &GetItemListReq{})
+	p.shopRequester.Request("getItemList", &GetItemListReq{})
 }
 
 // 购买物品
 func (p *PlayerRequester) BuyItem(instId int32, count int32) {
-	p.shopRequester.Request("buyItemReq", &BuyItemReq{instId: instId, count: count, totalMoney: p.money})
+	p.shopRequester.Request("buyItem", &BuyItemReq{instId: instId, count: count, totalMoney: p.money})
 }
 
 // 循环处理
