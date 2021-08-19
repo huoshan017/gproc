@@ -1,7 +1,12 @@
 package gproc
 
+import (
+	"time"
+)
+
 const (
-	CHANNEL_LENGTH = 100
+	CHANNEL_LENGTH  = 100
+	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
 )
 
 // 消息
@@ -72,8 +77,10 @@ func (h *handler) Send(sender ISender, reqName string, args interface{}) error {
 
 // 请求消息处理器
 type RequestHandler struct {
-	handler   *handler
-	handleMap map[string]func(sender ISender, args interface{})
+	handler    *handler
+	handleMap  map[string]func(sender ISender, args interface{})
+	tickHandle func(tick time.Duration)
+	tick       time.Duration
 }
 
 // 创建RequestHandler
@@ -104,6 +111,15 @@ func (h *RequestHandler) Close() {
 	h.handler.Close()
 }
 
+// 设置定时器处理
+func (h *RequestHandler) SetTickHandle(handle func(tick time.Duration), tick time.Duration) {
+	h.tickHandle = handle
+	if tick <= 0 {
+		tick = SERVICE_TICK_MS
+	}
+	h.tick = tick
+}
+
 // 注册
 func (h *RequestHandler) RegisterHandle(reqName string, handle func(ISender, interface{})) {
 	h.handleMap[reqName] = handle
@@ -119,17 +135,45 @@ func (h *RequestHandler) Run() error {
 	if h.handler.closed {
 		return ErrClosed
 	}
+
+	var lastTime time.Time
+	var ticker *time.Ticker
+	if h.tick > 0 && h.tickHandle != nil {
+		ticker = time.NewTicker(h.tick)
+		lastTime = time.Now()
+	}
+
 	loop := true
-	for loop {
-		select {
-		case m, o := <-h.handler.ch:
-			if !o {
-				return ErrClosed
+	if ticker == nil {
+		for loop {
+			select {
+			case m, o := <-h.handler.ch:
+				if !o {
+					return ErrClosed
+				}
+				h.handleReq(m.sender, m.name, m.args)
+			case <-h.handler.chClose:
+				h.handler.closed = true
+				loop = false
 			}
-			h.handleReq(m.sender, m.name, m.args)
-		case <-h.handler.chClose:
-			h.handler.closed = true
-			loop = false
+		}
+	} else {
+		for loop {
+			select {
+			case m, o := <-h.handler.ch:
+				if !o {
+					return ErrClosed
+				}
+				h.handleReq(m.sender, m.name, m.args)
+			case <-ticker.C:
+				now := time.Now()
+				tick := now.Sub(lastTime)
+				h.tickHandle(tick)
+				lastTime = now
+			case <-h.handler.chClose:
+				h.handler.closed = true
+				loop = false
+			}
 		}
 	}
 	return nil

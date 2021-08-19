@@ -7,17 +7,11 @@ import (
 
 var ErrClosed = errors.New("gproc: closed service cant request")
 
-const (
-	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
-)
-
 // 本地服务，处理Requester的请求，返回ResponseHandler
 type LocalService struct {
 	handler         *handler
 	requestHandler  *RequestHandler
 	responseHandler *ResponseHandler
-	tickHandle      func(tick time.Duration)
-	tick            time.Duration
 }
 
 // 创建本地服务
@@ -53,11 +47,7 @@ func (s *LocalService) Close() {
 
 // 设置定时器处理
 func (s *LocalService) SetTickHandle(h func(tick time.Duration), tick time.Duration) {
-	s.tickHandle = h
-	if tick <= 0 {
-		tick = SERVICE_TICK_MS
-	}
-	s.tick = tick
+	s.requestHandler.SetTickHandle(h, tick)
 }
 
 // 注册请求处理器
@@ -73,7 +63,7 @@ func (s *LocalService) Recv(sender ISender, msgName string, msgArgs interface{})
 // 循环处理请求
 func (s *LocalService) Run() error {
 	var err error
-	if s.tickHandle != nil {
+	if s.requestHandler.tickHandle != nil {
 		err = s.runProcessMsgAndTick()
 	} else {
 		err = s.runProcessMsg()
@@ -83,7 +73,7 @@ func (s *LocalService) Run() error {
 
 // 循环处理消息和定时器
 func (s *LocalService) runProcessMsgAndTick() error {
-	ticker := time.NewTicker(time.Duration(time.Millisecond * time.Duration(s.tick)))
+	ticker := time.NewTicker(time.Duration(time.Millisecond * time.Duration(s.requestHandler.tick)))
 	lastTime := time.Now()
 	run := true
 	for run {
@@ -96,7 +86,7 @@ func (s *LocalService) runProcessMsgAndTick() error {
 		case <-ticker.C:
 			now := time.Now()
 			tick := now.Sub(lastTime)
-			s.tickHandle(tick)
+			s.requestHandler.tickHandle(tick)
 			lastTime = now
 		case <-s.handler.chClose:
 			run = false

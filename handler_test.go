@@ -27,6 +27,7 @@ func (s *ShopHandler) Init() {
 	s.itemList = make([]*ShopItem, 0)
 	s.RegisterHandle("getItemList", s.getItemList)
 	s.RegisterHandle("buyItem", s.buyItem)
+	s.SetTickHandle(s.tick, time.Millisecond)
 }
 
 // 添加物品
@@ -108,9 +109,8 @@ func (s *ShopHandler) buyItem(sender ISender, args interface{}) {
 	sender.Send("buyItem", resp)
 }
 
-/*
 // 定时器处理
-func (s *ShopHandler) tick(tick int32) {
+func (s *ShopHandler) tick(tick time.Duration) {
 	// 价格随时间变化
 	for i := 0; i < len(s.itemList); i++ {
 		item := s.itemList[i]
@@ -119,7 +119,6 @@ func (s *ShopHandler) tick(tick int32) {
 		}
 	}
 }
-*/
 
 // 玩家
 type PlayerRequester struct {
