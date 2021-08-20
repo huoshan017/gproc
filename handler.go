@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	CHANNEL_LENGTH  = 100
+	CHANNEL_LENGTH  = 100 // 通道长度
 	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
 )
 
@@ -60,14 +60,14 @@ func (h *handler) IsClosed() bool {
 }
 
 // 内部发送函数
-func (h *handler) Send(sender ISender, reqName string, args interface{}) error {
+func (h *handler) Send(sender ISender, name string, args interface{}) error {
 	// 已关闭，防止重复close造成panic
 	if h.closed {
 		return ErrClosed
 	}
 	// 请求写入
 	m := &msg{
-		name:   reqName,
+		name:   name,
 		args:   args,
 		sender: sender,
 	}
@@ -121,8 +121,8 @@ func (h *RequestHandler) SetTickHandle(handle func(tick time.Duration), tick tim
 }
 
 // 注册
-func (h *RequestHandler) RegisterHandle(reqName string, handle func(ISender, interface{})) {
-	h.handleMap[reqName] = handle
+func (h *RequestHandler) RegisterHandle(msg string, handle func(ISender, interface{})) {
+	h.handleMap[msg] = handle
 }
 
 // 接收消息，实际等于Channel发送消息
@@ -180,8 +180,8 @@ func (h *RequestHandler) Run() error {
 }
 
 // 处理单个IRequester请求后的回调
-func (h *RequestHandler) handleReq(sender ISender, reqName string, args interface{}) bool {
-	handle, o := h.handleMap[reqName]
+func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}) bool {
+	handle, o := h.handleMap[name]
 	if !o {
 		return false
 	}

@@ -163,20 +163,21 @@ type Item struct {
 type Player struct {
 	ResponseHandler // 一般是通过继承来使用ResponseHandler
 	shopRequester   IRequester
+	id 				int32
 	money           int32
 	itemList        []*Item
 }
 
 // 创建玩家
-func NewPlayer(money int32) *Player {
-	p := &Player{money: money, itemList: make([]*Item, 0)}
+func NewPlayer(id int32, money int32) *Player {
+	p := &Player{id: id, money: money, itemList: make([]*Item, 0)}
 	p.InitDefault()
 	return p
 }
 
 // 创建商店请求者
 func (p *Player) CreateShopRequester(shop *ShopService) {
-	p.shopRequester = NewRequester(p, shop)
+	p.shopRequester = NewRequester(p, shop, p.id)
 }
 
 // 注册回调
@@ -276,7 +277,7 @@ func TestShopService(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < playerCount; i++ {
-		p := NewPlayer(100000)
+		p := NewPlayer(int32(i+1), 100000)
 		p.CreateShopRequester(shop)
 		p.RegisterResponseHandlers()
 		go p.Run(&wg)

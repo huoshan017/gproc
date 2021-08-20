@@ -124,20 +124,21 @@ func (s *ShopHandler) tick(tick time.Duration) {
 type PlayerRequester struct {
 	ResponseHandler // 一般是通过继承来使用ResponseHandler
 	shopRequester   IRequester
+	id              int32
 	money           int32
 	itemList        []*Item
 }
 
 // 创建玩家
-func NewPlayerRequester(money int32) *PlayerRequester {
-	p := &PlayerRequester{money: money, itemList: make([]*Item, 0)}
+func NewPlayerRequester(id int32, money int32) *PlayerRequester {
+	p := &PlayerRequester{id: id, money: money, itemList: make([]*Item, 0)}
 	p.InitDefault()
 	return p
 }
 
 // 创建商店请求者
 func (p *PlayerRequester) CreateShopRequester(shop *ShopHandler) {
-	p.shopRequester = NewRequester(p, shop)
+	p.shopRequester = NewRequester(p, shop, p.id)
 }
 
 // 注册回调
@@ -236,8 +237,8 @@ func TestShopHandler(t *testing.T) {
 	defer shop.Close()
 
 	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < playerCount; i++ {
-		p := NewPlayerRequester(100000)
+	for i := int32(0); i < int32(playerCount); i++ {
+		p := NewPlayerRequester(i+1, 100000)
 		p.CreateShopRequester(shop)
 		p.RegisterResponseHandlers()
 		go p.Run(&wg)

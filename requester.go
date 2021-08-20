@@ -5,18 +5,20 @@ package gproc
 type Requester struct {
 	owner       IResponseHandler             // Requester的持有者
 	receiver    IRequestHandler              // Requester请求的接收者
-	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为callbackMap初始化时还未开始执行handle
+	callbackMap map[string]func(interface{}) // 之所以不用线程安全的sync.Map，是因为Requester只在一个goroutine中使用
 	options     RequestOptions
+	key         interface{} // requester的key，告诉对面的receiver唯一标识自己，用于转发和通知
 }
 
 // 创建请求者
-func NewRequester(owner IResponseHandler, receiver IRequestHandler, options ...RequestOption) IRequester {
+func NewRequester(owner IResponseHandler, receiver IRequestHandler, key interface{}, options ...RequestOption) IRequester {
 	if owner == nil || receiver == nil {
 		panic("owner or receiver is nil")
 	}
 	req := &Requester{
 		owner:       owner,
 		receiver:    receiver,
+		key:         key,
 		callbackMap: make(map[string]func(interface{})),
 	}
 	owner.addRequester(req)
