@@ -215,7 +215,7 @@ func (h *RequestHandler) handleForward(fromKey, toKey interface{}, name string, 
 	if !o {
 		return ErrNotFoundRequesterKey
 	}
-	return r.Forward(s, fromKey, name, args)
+	return r.forward(s, fromKey, name, args)
 }
 
 // 返回消息处理器
@@ -267,7 +267,7 @@ func (h *ResponseHandler) Send(name string, args interface{}) error {
 }
 
 // 转发消息
-func (h *ResponseHandler) Forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error {
+func (h *ResponseHandler) forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error {
 	m := getMsg()
 	m.typ = msgForward
 	m.name = name

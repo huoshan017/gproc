@@ -3,12 +3,12 @@ package gproc
 // 请求者，发起请求到IRequesterHandler，除创建初始化外整个生命周期在同一个goroutine中
 // 一般跟IRequestHandler不在同一个goroutine
 type Requester struct {
-	owner       IResponseHandler                                                       // Requester的持有者
-	receiver    IRequestHandler                                                        // Requester请求的接收者
-	callbackMap map[string]func(interface{})                                           // 之所以不用线程安全的sync.Map，是因为Requester只在一个goroutine中使用
-	forwardMap  map[string]func(sender ISender, fromKey interface{}, args interface{}) // 转发消息到处理函数的映射
-	options     RequestOptions                                                         // 请求选项
-	key         interface{}                                                            // requester的key，告诉对面的receiver唯一标识自己，用于转发和通知
+	owner       IResponseHandler                                       // Requester的持有者
+	receiver    IRequestHandler                                        // Requester请求的接收者
+	callbackMap map[string]func(interface{})                           // 之所以不用线程安全的sync.Map，是因为Requester只在一个goroutine中使用
+	forwardMap  map[string]func(fromKey interface{}, args interface{}) // 转发消息到处理函数的映射
+	options     RequestOptions                                         // 请求选项
+	key         interface{}                                            // requester的key，告诉对面的receiver唯一标识自己，用于转发和通知
 }
 
 // 创建请求者
@@ -21,7 +21,7 @@ func NewRequester(owner IResponseHandler, receiver IRequestHandler, key interfac
 		receiver:    receiver,
 		key:         key,
 		callbackMap: make(map[string]func(interface{})),
-		forwardMap:  make(map[string]func(ISender, interface{}, interface{})),
+		forwardMap:  make(map[string]func(interface{}, interface{})),
 	}
 	owner.addRequester(req)
 	for _, option := range options {
@@ -71,7 +71,7 @@ func (r *Requester) RequestForward(toKey interface{}, name string, args interfac
 }
 
 // 注册转发处理器
-func (r *Requester) RegisterForward(name string, handle func(ISender, interface{}, interface{})) {
+func (r *Requester) RegisterForward(name string, handle func(interface{}, interface{})) {
 	r.forwardMap[name] = handle
 }
 
@@ -88,7 +88,7 @@ func (r *Requester) handle(m *msg) bool {
 		if !o {
 			return false
 		}
-		handle(m.sender, m.fromKey, m.args)
+		handle(m.fromKey, m.args)
 	} else {
 		return false
 	}

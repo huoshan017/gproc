@@ -2,14 +2,10 @@ package gproc
 
 // 发送者接口
 type ISender interface {
-	// sender对应的key
-	//GetKey() interface{}
 	// 发送普通消息
 	Send(name string, args interface{}) error
 	// 转发消息
-	Forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error
-	// 通知
-	//Notify(name string, args interface{}) error
+	forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error
 }
 
 // 请求者接口
@@ -23,7 +19,7 @@ type IRequester interface {
 	// 请求转发给
 	RequestForward(toKey interface{}, name string, arg interface{}) error
 	// 注册转发处理器
-	RegisterForward(name string, handle func(sender ISender, fromKey interface{}, args interface{}))
+	RegisterForward(name string, handle func(fromKey interface{}, args interface{}))
 	// 处理返回
 	handle(m *msg) bool
 }
