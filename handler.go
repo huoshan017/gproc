@@ -5,17 +5,9 @@ import (
 )
 
 const (
-	CHANNEL_LENGTH  = 100 // 通道长度
+	CHANNEL_LENGTH  = 100                   // 通道长度
 	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
 )
-
-// 消息
-type msg struct {
-	typ    uint8
-	name   string
-	args   interface{}
-	sender ISender
-}
 
 // 消息处理器
 type handler struct {
@@ -60,16 +52,10 @@ func (h *handler) IsClosed() bool {
 }
 
 // 内部发送函数
-func (h *handler) Send(sender ISender, name string, args interface{}) error {
+func (h *handler) Send(m *msg) error {
 	// 已关闭，防止重复close造成panic
 	if h.closed {
 		return ErrClosed
-	}
-	// 请求写入
-	m := &msg{
-		name:   name,
-		args:   args,
-		sender: sender,
 	}
 	h.ch <- m
 	return nil
@@ -79,6 +65,7 @@ func (h *handler) Send(sender ISender, name string, args interface{}) error {
 type RequestHandler struct {
 	handler    *handler
 	handleMap  map[string]func(sender ISender, args interface{})
+	signUpMap  map[interface{}]ISender
 	tickHandle func(tick time.Duration)
 	tick       time.Duration
 }
@@ -99,6 +86,7 @@ func NewDefaultRequestHandler() *RequestHandler {
 func (h *RequestHandler) Init(handler *handler) {
 	h.handler = handler
 	h.handleMap = make(map[string]func(sender ISender, args interface{}))
+	h.signUpMap = make(map[interface{}]ISender)
 }
 
 // 默认初始化
@@ -126,8 +114,17 @@ func (h *RequestHandler) RegisterHandle(msg string, handle func(ISender, interfa
 }
 
 // 接收消息，实际等于Channel发送消息
-func (h *RequestHandler) Recv(sender ISender, msgName string, msgArgs interface{}) error {
-	return h.handler.Send(sender, msgName, msgArgs)
+func (h *RequestHandler) recv(m *msg) error {
+	return h.handler.Send(m)
+}
+
+// 通知
+func (h *RequestHandler) Notify(toKey interface{}, name string, args interface{}) error {
+	s, o := h.signUpMap[toKey]
+	if !o {
+		return ErrNotFoundRequesterKey
+	}
+	return s.Send(name, args)
 }
 
 // 处理接收的消息
@@ -151,7 +148,7 @@ func (h *RequestHandler) Run() error {
 				if !o {
 					return ErrClosed
 				}
-				h.handleReq(m.sender, m.name, m.args)
+				h.handleMsg(m)
 			case <-h.handler.chClose:
 				h.handler.closed = true
 				loop = false
@@ -164,7 +161,7 @@ func (h *RequestHandler) Run() error {
 				if !o {
 					return ErrClosed
 				}
-				h.handleReq(m.sender, m.name, m.args)
+				h.handleMsg(m)
 			case <-ticker.C:
 				now := time.Now()
 				tick := now.Sub(lastTime)
@@ -179,6 +176,25 @@ func (h *RequestHandler) Run() error {
 	return nil
 }
 
+func (h *RequestHandler) handleMsg(m *msg) bool {
+	result := true
+	switch m.typ {
+	case msgNormal:
+		result = h.handleReq(m.sender, m.name, m.args)
+	case msgSignup:
+		h.signUpMap[m.fromKey] = m.sender
+	case msgForward:
+		err := h.handleForward(m.fromKey, m.toKey, m.name, m.args)
+		if err != nil {
+			result = false
+		}
+	default:
+		result = false
+	}
+	putMsg(m)
+	return result
+}
+
 // 处理单个IRequester请求后的回调
 func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}) bool {
 	handle, o := h.handleMap[name]
@@ -187,6 +203,19 @@ func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}
 	}
 	handle(sender, args)
 	return true
+}
+
+// 处理转发
+func (h *RequestHandler) handleForward(fromKey, toKey interface{}, name string, args interface{}) error {
+	r, o := h.signUpMap[toKey]
+	if !o {
+		return ErrNotFoundRequesterKey
+	}
+	s, o := h.signUpMap[fromKey]
+	if !o {
+		return ErrNotFoundRequesterKey
+	}
+	return r.Forward(s, fromKey, name, args)
 }
 
 // 返回消息处理器
@@ -229,8 +258,23 @@ func (h *ResponseHandler) addRequester(req IRequester) {
 }
 
 // 发送
-func (h *ResponseHandler) Send(msgName string, msgArgs interface{}) error {
-	return h.handler.Send(nil, msgName, msgArgs)
+func (h *ResponseHandler) Send(name string, args interface{}) error {
+	m := getMsg()
+	m.typ = msgNormal
+	m.name = name
+	m.args = args
+	return h.handler.Send(m)
+}
+
+// 转发消息
+func (h *ResponseHandler) Forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error {
+	m := getMsg()
+	m.typ = msgForward
+	m.name = name
+	m.sender = fromSender
+	m.fromKey = fromKey
+	m.args = args
+	return h.handler.Send(m)
 }
 
 // 更新处理IRequester的回调
@@ -257,10 +301,11 @@ func (h *ResponseHandler) Update() error {
 }
 
 // 处理返回
-func (r *ResponseHandler) handleResp(resp *msg) {
+func (r *ResponseHandler) handleResp(m *msg) {
 	for k := range r.requesterMap {
-		if k.handle(resp.name, resp.args) {
+		if k.handle(m) {
 			break
 		}
 	}
+	putMsg(m)
 }

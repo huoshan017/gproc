@@ -1,11 +1,8 @@
 package gproc
 
 import (
-	"errors"
 	"time"
 )
-
-var ErrClosed = errors.New("gproc: closed service cant request")
 
 // 本地服务，处理Requester的请求，返回ResponseHandler
 type LocalService struct {
@@ -55,9 +52,9 @@ func (s *LocalService) RegisterHandle(reqName string, handle func(ISender, inter
 	s.requestHandler.RegisterHandle(reqName, handle)
 }
 
-// 接收消息
-func (s *LocalService) Recv(sender ISender, msgName string, msgArgs interface{}) error {
-	return s.requestHandler.Recv(sender, msgName, msgArgs)
+// 通知
+func (s *LocalService) Notify(toKey interface{}, name string, args interface{}) error {
+	return s.requestHandler.Notify(toKey, name, args)
 }
 
 // 循环处理请求
@@ -69,6 +66,11 @@ func (s *LocalService) Run() error {
 		err = s.runProcessMsg()
 	}
 	return err
+}
+
+// 接收消息
+func (s *LocalService) recv(m *msg) error {
+	return s.requestHandler.recv(m)
 }
 
 // 循环处理消息和定时器
@@ -115,9 +117,8 @@ func (s *LocalService) runProcessMsg() error {
 // 处理消息，包括请求和返回的结果
 func (s *LocalService) processMsg(r *msg) {
 	// 处理外部请求
-	if s.requestHandler.handleReq(r.sender, r.name, r.args) {
-		return
+	if !s.requestHandler.handleMsg(r) {
+		// 遍历内部IRequester处理返回结果
+		s.responseHandler.handleResp(r)
 	}
-	// 遍历内部IRequester处理返回结果
-	s.responseHandler.handleResp(r)
 }

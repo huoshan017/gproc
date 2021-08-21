@@ -163,7 +163,7 @@ type Item struct {
 type Player struct {
 	ResponseHandler // 一般是通过继承来使用ResponseHandler
 	shopRequester   IRequester
-	id 				int32
+	id              int32
 	money           int32
 	itemList        []*Item
 }
