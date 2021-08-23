@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// 本地服务，处理Requester的请求，返回ResponseHandler
+// 本地服务，处理Requester的请求作为RequestHandler，又可作为Requester的持有者ResponseHandler发送请求
 type LocalService struct {
 	handler         *handler
 	requestHandler  *RequestHandler
@@ -55,6 +55,11 @@ func (s *LocalService) RegisterHandle(reqName string, handle func(ISender, inter
 // 通知
 func (s *LocalService) Notify(toKey interface{}, name string, args interface{}) error {
 	return s.requestHandler.Notify(toKey, name, args)
+}
+
+// 创建请求者
+func (s *LocalService) NewRequester(receiver IRequestHandler, key interface{}, options ...RequestOption) IRequester {
+	return NewRequester(s.responseHandler, receiver, key, options...)
 }
 
 // 循环处理请求
