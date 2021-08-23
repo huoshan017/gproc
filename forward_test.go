@@ -52,21 +52,25 @@ func (p *ChatPlayer) CreateRequester(chatService *ChatService) {
 }
 
 func (p *ChatPlayer) RegisterHandles() {
-	p.chatRequester.RegisterForward("msgChat", func(fromKey interface{}, args interface{}) {
-		chatMsg := args.(*msgChat)
-		fmt.Println("player ", p.id, " recv message ", chatMsg.message, " from player ", fromKey)
-		ack := &msgChatAck{message: chatMsg.message}
-		err := p.chatRequester.RequestForward(fromKey, "msgChatAck", ack)
-		if err != nil {
-			fmt.Println("player ", p.id, " request forward player ", fromKey, " err: ", err)
-			return
-		}
-		fmt.Println("player ", p.id, " ack message ", ack.message, " to sender ", fromKey)
-	})
-	p.chatRequester.RegisterForward("msgChatAck", func(fromKey interface{}, args interface{}) {
-		chatAckMsg := args.(*msgChatAck)
-		fmt.Println("player ", p.id, " recv ack message ", chatAckMsg.message, " from player ", fromKey)
-	})
+	p.chatRequester.RegisterForward("msgChat", p.handleChat)
+	p.chatRequester.RegisterForward("msgChatAck", p.handleChatAck)
+}
+
+func (p *ChatPlayer) handleChat(fromKey interface{}, args interface{}) {
+	chatMsg := args.(*msgChat)
+	fmt.Println("player ", p.id, " recv message ", chatMsg.message, " from player ", fromKey)
+	ack := &msgChatAck{message: chatMsg.message}
+	err := p.chatRequester.RequestForward(fromKey, "msgChatAck", ack)
+	if err != nil {
+		fmt.Println("player ", p.id, " request forward player ", fromKey, " err: ", err)
+		return
+	}
+	fmt.Println("player ", p.id, " ack message ", ack.message, " to sender ", fromKey)
+}
+
+func (p *ChatPlayer) handleChatAck(fromKey interface{}, args interface{}) {
+	chatAckMsg := args.(*msgChatAck)
+	fmt.Println("player ", p.id, " recv ack message ", chatAckMsg.message, " from player ", fromKey)
 }
 
 func (p *ChatPlayer) ChatTo(pid int32, message string) {

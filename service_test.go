@@ -163,14 +163,33 @@ type Item struct {
 type Player struct {
 	ResponseHandler // 一般是通过继承来使用ResponseHandler
 	shopRequester   IRequester
+	friendRequester IRequester
 	id              int32
+	level           int32
+	exp             int32
 	money           int32
 	itemList        []*Item
+	friendList      []int32 // 好友列表
+	step            int     // 步骤
+}
+
+// 玩家初始化配置
+type playerConfig struct {
+	level int32
+	exp   int32
+	money int32
 }
 
 // 创建玩家
-func NewPlayer(id int32, money int32) *Player {
-	p := &Player{id: id, money: money, itemList: make([]*Item, 0)}
+func NewPlayer(id int32, config *playerConfig) *Player {
+	p := &Player{
+		id:         id,
+		level:      config.level,
+		exp:        config.exp,
+		money:      config.money,
+		itemList:   make([]*Item, 0),
+		friendList: make([]int32, 0),
+	}
 	p.InitDefault()
 	return p
 }
@@ -181,7 +200,7 @@ func (p *Player) CreateShopRequester(shop *ShopService) {
 }
 
 // 注册回调
-func (p *Player) RegisterResponseHandlers() {
+func (p *Player) RegisterShopHandlers() {
 	p.shopRequester.RegisterCallback("getItemList", func(param interface{}) {
 		//resp := param.(*GetItemListResp)
 		//log.Printf("get item list: %v", resp.itemList)
@@ -277,9 +296,9 @@ func TestShopService(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < playerCount; i++ {
-		p := NewPlayer(int32(i+1), 100000)
+		p := NewPlayer(int32(i+1), &playerConfig{money: 100000})
 		p.CreateShopRequester(shop)
-		p.RegisterResponseHandlers()
+		p.RegisterShopHandlers()
 		go p.Run(&wg)
 		defer p.Close()
 	}
