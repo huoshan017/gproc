@@ -12,12 +12,12 @@ type ISender interface {
 type IRequester interface {
 	// 请求
 	Request(msgName string, arg interface{}) error
+	// 请求转发
+	RequestForward(toKey interface{}, name string, arg interface{}) error
 	// 注册请求回调
 	RegisterCallback(msgName string, callback func(interface{}))
 	// 注册通知处理器
 	RegisterNotify(name string, handler func(interface{}))
-	// 请求转发给
-	RequestForward(toKey interface{}, name string, arg interface{}) error
 	// 注册转发处理器
 	RegisterForward(name string, handle func(fromKey interface{}, args interface{}))
 	// 处理返回
