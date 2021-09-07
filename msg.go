@@ -10,7 +10,7 @@ const (
 	msgNormal  msgType = 0 // 普通
 	msgSignup  msgType = 1 // 报名
 	msgForward msgType = 2 // 转发
-	//msgNortify msgType = 3 // 通知
+	//msgNotify msgType = 3 // 通知
 )
 
 // 消息
