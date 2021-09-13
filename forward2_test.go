@@ -205,7 +205,7 @@ func (s *FriendService) Init() {
 }
 
 func (s *FriendService) RegisterHandles() {
-	s.RegisterHandle("msgUpdateFriendInfo", func(sender ISender, args interface{}) {
+	s.RegisterHandle("msgUpdateFriendInfo", func(_ ISender, args interface{}) {
 		msg := args.(*msgUpdateFriendInfo)
 		s.PlayerIds = append(s.PlayerIds, msg.selfId)
 		fmt.Println("Player ", msg.selfId, " update friend info, now player list ", s.PlayerIds)
@@ -234,7 +234,7 @@ func CreateFriendService() *FriendService {
 /********************************************************************/
 
 func randPlayerId(selfId int32, playerIds []int32) int32 {
-	if playerIds == nil || len(playerIds) == 0 {
+	if len(playerIds) == 0 {
 		fmt.Println("Player ", selfId, " no friends")
 		return -1
 	}
@@ -271,7 +271,7 @@ func TestFriendService(t *testing.T) {
 		p := players[id-1]
 		go func(p *Player) {
 			state := 0
-			for {
+			for state != 4 {
 				switch p.step {
 				case 0:
 					// 获得推荐列表
@@ -297,7 +297,6 @@ func TestFriendService(t *testing.T) {
 						state = 4
 						atomic.AddInt32(&count, 1)
 						fmt.Println("wgDone ", count)
-						break
 					}
 				}
 				p.Update()

@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	CHANNEL_LENGTH  = 100                   // 通道长度
-	SERVICE_TICK_MS = 10 * time.Millisecond // 定时器间隔
+	ChannelLength       = 100                                  // 通道长度
+	ServiceTickDuration = time.Duration(10 * time.Millisecond) // 定时器间隔
 )
 
 // 消息处理器
@@ -31,7 +31,7 @@ func newDefaultHandler() *handler {
 // 创建消息处理器
 func (h *handler) Init(chanLen int32) {
 	if chanLen <= 0 {
-		chanLen = CHANNEL_LENGTH
+		chanLen = ChannelLength
 	}
 	h.ch = make(chan *msg, chanLen)
 	h.chClose = make(chan struct{})
@@ -63,11 +63,12 @@ func (h *handler) Send(m *msg) error {
 
 // 请求消息处理器
 type RequestHandler struct {
-	handler    *handler
-	handleMap  map[string]func(sender ISender, args interface{})
-	signUpMap  map[interface{}]ISender
-	tickHandle func(tick time.Duration)
-	tick       time.Duration
+	handler               *handler
+	handleMap             map[string]func(sender ISender, args interface{})
+	signUpMap             map[interface{}]ISender
+	tickHandle            func(tick time.Duration)
+	forwardNoTargetHandle map[string]func(sender ISender, toKey interface{}, args interface{})
+	tick                  time.Duration
 }
 
 // 创建RequestHandler
@@ -87,6 +88,7 @@ func (h *RequestHandler) Init(handler *handler) {
 	h.handler = handler
 	h.handleMap = make(map[string]func(sender ISender, args interface{}))
 	h.signUpMap = make(map[interface{}]ISender)
+	h.forwardNoTargetHandle = make(map[string]func(sender ISender, toKey interface{}, args interface{}))
 }
 
 // 默认初始化
@@ -103,7 +105,7 @@ func (h *RequestHandler) Close() {
 func (h *RequestHandler) SetTickHandle(handle func(tick time.Duration), tick time.Duration) {
 	h.tickHandle = handle
 	if tick <= 0 {
-		tick = SERVICE_TICK_MS
+		tick = ServiceTickDuration
 	}
 	h.tick = tick
 }
@@ -111,6 +113,11 @@ func (h *RequestHandler) SetTickHandle(handle func(tick time.Duration), tick tim
 // 注册
 func (h *RequestHandler) RegisterHandle(msg string, handle func(ISender, interface{})) {
 	h.handleMap[msg] = handle
+}
+
+// 注册无目标转发时的处理器
+func (h *RequestHandler) RegisterForward4NoTarget(msgName string, handle func(ISender, interface{}, interface{})) {
+
 }
 
 // 接收消息，实际等于Channel发送消息
@@ -185,6 +192,7 @@ func (h *RequestHandler) handleMsg(m *msg) bool {
 		h.signUpMap[m.fromKey] = m.sender
 	case msgForward:
 		err := h.handleForward(m.fromKey, m.toKey, m.name, m.args)
+		// todo 错误处理先放着
 		if err != nil {
 			result = false
 		}
@@ -207,13 +215,20 @@ func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}
 
 // 处理转发
 func (h *RequestHandler) handleForward(fromKey, toKey interface{}, name string, args interface{}) error {
-	r, o := h.signUpMap[toKey]
+	s, o := h.signUpMap[fromKey]
+	// 找不到请求者
 	if !o {
 		return ErrNotFoundRequesterKey
 	}
-	s, o := h.signUpMap[fromKey]
+	r, o := h.signUpMap[toKey]
+	// 找不到toKey对应的目标，转到无目标的转发处理器
 	if !o {
-		return ErrNotFoundRequesterKey
+		handle, o := h.forwardNoTargetHandle[name]
+		if !o {
+			return ErrNotFoundNoTargetForwardHandle
+		}
+		handle(s, toKey, args)
+		return nil
 	}
 	return r.forward(s, fromKey, name, args)
 }

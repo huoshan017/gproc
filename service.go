@@ -20,7 +20,7 @@ func NewLocalService(chanLen int32) *LocalService {
 
 // 创建默认本地服务
 func NewDefaultLocalService() *LocalService {
-	return NewLocalService(CHANNEL_LENGTH)
+	return NewLocalService(ChannelLength)
 }
 
 // 初始化
@@ -33,7 +33,7 @@ func (s *LocalService) Init(chanLen int32) {
 
 // 默认初始化
 func (s *LocalService) InitDefault() {
-	s.Init(CHANNEL_LENGTH)
+	s.Init(ChannelLength)
 }
 
 // 关闭
@@ -48,8 +48,13 @@ func (s *LocalService) SetTickHandle(h func(tick time.Duration), tick time.Durat
 }
 
 // 注册请求处理器
-func (s *LocalService) RegisterHandle(reqName string, handle func(ISender, interface{})) {
-	s.requestHandler.RegisterHandle(reqName, handle)
+func (s *LocalService) RegisterHandle(msgName string, handle func(ISender, interface{})) {
+	s.requestHandler.RegisterHandle(msgName, handle)
+}
+
+// 注册无法找到目标的转发处理器
+func (s *LocalService) RegisterForward4NoTarget(msgName string, handle func(ISender, interface{}, interface{})) {
+	s.requestHandler.RegisterForward4NoTarget(msgName, handle)
 }
 
 // 通知
