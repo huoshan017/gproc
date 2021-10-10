@@ -47,8 +47,8 @@ func NewChatPlayer(id int32) *ChatPlayer {
 	return p
 }
 
-func (p *ChatPlayer) CreateRequester(chatService *ChatService) {
-	p.chatRequester = NewRequester(p, chatService, p.id)
+func (p *ChatPlayer) InitRequester(chatService *ChatService) {
+	p.chatRequester = p.CreateRequester(chatService, p.id)
 }
 
 func (p *ChatPlayer) RegisterHandles() {
@@ -141,7 +141,7 @@ func TestChatForward(t *testing.T) {
 		p := NewChatPlayer(playerIds[i])
 		defer p.Close()
 
-		p.CreateRequester(chatService)
+		p.InitRequester(chatService)
 		p.RegisterHandles()
 		go p.Run(&wg)
 	}

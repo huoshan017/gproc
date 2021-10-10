@@ -267,6 +267,11 @@ func (h *ResponseHandler) Close() {
 	h.handler.Close()
 }
 
+// 创建请求者
+func (h *ResponseHandler) CreateRequester(receiver IRequestHandler, key interface{}, options ...RequestOption) IRequester {
+	return NewRequester(h, receiver, key, options...)
+}
+
 // 添加请求者
 func (h *ResponseHandler) addRequester(req IRequester) {
 	h.requesterMap[req] = struct{}{}

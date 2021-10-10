@@ -30,17 +30,19 @@ type IRequestHandler interface {
 	RegisterHandle(msgName string, handle func(ISender, interface{}))
 	// 注册无法找到目标的转发处理器
 	RegisterForward4NoTarget(msgName string, handle func(sender ISender, toKey interface{}, args interface{}))
-	// 接收IRequester发来的数据
-	recv(m *msg) error
 	// 运行
 	Run() error
+	// 接收IRequester发来的数据
+	recv(m *msg) error
 }
 
 // 返回消息处理器
 type IResponseHandler interface {
 	ISender
-	// 添加请求者
-	addRequester(req IRequester)
+	// 创建请求者
+	CreateRequester(receiver IRequestHandler, key interface{}, options ...RequestOption) IRequester
 	// 更新
 	Update() error
+	// 添加请求者
+	addRequester(req IRequester)
 }
