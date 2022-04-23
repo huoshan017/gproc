@@ -48,18 +48,18 @@ func (s *LocalService) SetTickHandle(h func(tick time.Duration), tick time.Durat
 }
 
 // 注册请求处理器
-func (s *LocalService) RegisterHandle(msgName string, handle func(ISender, interface{})) {
-	s.requestHandler.RegisterHandle(msgName, handle)
+func (s *LocalService) RegisterHandle(msgId uint32, handle func(ISender, interface{})) {
+	s.requestHandler.RegisterHandle(msgId, handle)
 }
 
 // 注册无法找到目标的转发处理器
-func (s *LocalService) RegisterForward4NoTarget(msgName string, handle func(ISender, interface{}, interface{})) {
-	s.requestHandler.RegisterForward4NoTarget(msgName, handle)
+func (s *LocalService) RegisterForward4NoTarget(msgId uint32, handle func(ISender, interface{}, interface{})) {
+	s.requestHandler.RegisterForward4NoTarget(msgId, handle)
 }
 
 // 通知
-func (s *LocalService) Notify(toKey interface{}, name string, args interface{}) error {
-	return s.requestHandler.Notify(toKey, name, args)
+func (s *LocalService) Notify(toKey interface{}, msgId uint32, args interface{}) error {
+	return s.requestHandler.Notify(toKey, msgId, args)
 }
 
 // 创建请求者

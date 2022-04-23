@@ -64,10 +64,10 @@ func (h *handler) Send(m *msg) error {
 // 请求消息处理器
 type RequestHandler struct {
 	handler               *handler
-	handleMap             map[string]func(sender ISender, args interface{})
+	handleMap             map[uint32]func(sender ISender, args interface{})
 	signUpMap             map[interface{}]ISender
 	tickHandle            func(tick time.Duration)
-	forwardNoTargetHandle map[string]func(sender ISender, toKey interface{}, args interface{})
+	forwardNoTargetHandle map[uint32]func(sender ISender, toKey interface{}, args interface{})
 	tick                  time.Duration
 }
 
@@ -86,9 +86,9 @@ func NewDefaultRequestHandler() *RequestHandler {
 // 初始化
 func (h *RequestHandler) Init(handler *handler) {
 	h.handler = handler
-	h.handleMap = make(map[string]func(sender ISender, args interface{}))
+	h.handleMap = make(map[uint32]func(sender ISender, args interface{}))
 	h.signUpMap = make(map[interface{}]ISender)
-	h.forwardNoTargetHandle = make(map[string]func(sender ISender, toKey interface{}, args interface{}))
+	h.forwardNoTargetHandle = make(map[uint32]func(sender ISender, toKey interface{}, args interface{}))
 }
 
 // 默认初始化
@@ -111,12 +111,12 @@ func (h *RequestHandler) SetTickHandle(handle func(tick time.Duration), tick tim
 }
 
 // 注册
-func (h *RequestHandler) RegisterHandle(msg string, handle func(ISender, interface{})) {
-	h.handleMap[msg] = handle
+func (h *RequestHandler) RegisterHandle(msgId uint32, handle func(ISender, interface{})) {
+	h.handleMap[msgId] = handle
 }
 
 // 注册无目标转发时的处理器
-func (h *RequestHandler) RegisterForward4NoTarget(msgName string, handle func(ISender, interface{}, interface{})) {
+func (h *RequestHandler) RegisterForward4NoTarget(msgId uint32, handle func(ISender, interface{}, interface{})) {
 
 }
 
@@ -126,12 +126,12 @@ func (h *RequestHandler) recv(m *msg) error {
 }
 
 // 通知
-func (h *RequestHandler) Notify(toKey interface{}, name string, args interface{}) error {
+func (h *RequestHandler) Notify(toKey interface{}, msgId uint32, args interface{}) error {
 	s, o := h.signUpMap[toKey]
 	if !o {
 		return ErrNotFoundRequesterKey
 	}
-	return s.Send(name, args)
+	return s.Send(msgId, args)
 }
 
 // 处理接收的消息
@@ -187,11 +187,11 @@ func (h *RequestHandler) handleMsg(m *msg) bool {
 	result := true
 	switch m.typ {
 	case msgNormal:
-		result = h.handleReq(m.sender, m.name, m.args)
+		result = h.handleReq(m.sender, m.id, m.args)
 	case msgSignup:
 		h.signUpMap[m.fromKey] = m.sender
 	case msgForward:
-		err := h.handleForward(m.fromKey, m.toKey, m.name, m.args)
+		err := h.handleForward(m.fromKey, m.toKey, m.id, m.args)
 		// todo 错误处理先放着
 		if err != nil {
 			result = false
@@ -204,8 +204,8 @@ func (h *RequestHandler) handleMsg(m *msg) bool {
 }
 
 // 处理单个IRequester请求后的回调
-func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}) bool {
-	handle, o := h.handleMap[name]
+func (h *RequestHandler) handleReq(sender ISender, msgId uint32, args interface{}) bool {
+	handle, o := h.handleMap[msgId]
 	if !o {
 		return false
 	}
@@ -214,7 +214,7 @@ func (h *RequestHandler) handleReq(sender ISender, name string, args interface{}
 }
 
 // 处理转发
-func (h *RequestHandler) handleForward(fromKey, toKey interface{}, name string, args interface{}) error {
+func (h *RequestHandler) handleForward(fromKey, toKey interface{}, msgId uint32, args interface{}) error {
 	s, o := h.signUpMap[fromKey]
 	// 找不到请求者
 	if !o {
@@ -223,14 +223,14 @@ func (h *RequestHandler) handleForward(fromKey, toKey interface{}, name string, 
 	r, o := h.signUpMap[toKey]
 	// 找不到toKey对应的目标，转到无目标的转发处理器
 	if !o {
-		handle, o := h.forwardNoTargetHandle[name]
+		handle, o := h.forwardNoTargetHandle[msgId]
 		if !o {
 			return ErrNotFoundNoTargetForwardHandle
 		}
 		handle(s, toKey, args)
 		return nil
 	}
-	return r.forward(s, fromKey, name, args)
+	return r.forward(s, fromKey, msgId, args)
 }
 
 // 返回消息处理器
@@ -278,19 +278,19 @@ func (h *ResponseHandler) addRequester(req IRequester) {
 }
 
 // 发送
-func (h *ResponseHandler) Send(name string, args interface{}) error {
+func (h *ResponseHandler) Send(msgId uint32, args interface{}) error {
 	m := getMsg()
 	m.typ = msgNormal
-	m.name = name
+	m.id = msgId
 	m.args = args
 	return h.handler.Send(m)
 }
 
 // 转发消息
-func (h *ResponseHandler) forward(fromSender ISender, fromKey interface{}, name string, args interface{}) error {
+func (h *ResponseHandler) forward(fromSender ISender, fromKey interface{}, msgId uint32, args interface{}) error {
 	m := getMsg()
 	m.typ = msgForward
-	m.name = name
+	m.id = msgId
 	m.sender = fromSender
 	m.fromKey = fromKey
 	m.args = args

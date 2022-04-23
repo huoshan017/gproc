@@ -50,6 +50,15 @@ const (
 	PlayerFriendStateAddFriendReq          = 2
 )
 
+const (
+	MsgIdFriendRecommendationList = 1
+	MsgIdFriendAdd                = 2
+	MsgIdFriendRemove             = 3
+	MsgIdFriendAddAck             = 4
+	MsgIdFriendRemoveAck          = 5
+	MsgIdUpdateFriendInfo         = 6
+)
+
 // 创建商店请求者
 func (p *Player) CreateFriendRequester(fs *FriendService) {
 	p.friendRequester = NewRequester(p, fs, p.id)
@@ -57,11 +66,11 @@ func (p *Player) CreateFriendRequester(fs *FriendService) {
 
 // 注册回调
 func (p *Player) RegisterFriendHandlers() {
-	p.friendRequester.RegisterCallback("msgFriendRecommendationList", p.handleFriendRecommendationList)
-	p.friendRequester.RegisterForward("msgFriendAdd", p.handleFriendAdd)
-	p.friendRequester.RegisterForward("msgFriendRemove", p.handleFriendRemove)
-	p.friendRequester.RegisterForward("msgFriendAddAck", p.handleFriendAddAck)
-	p.friendRequester.RegisterForward("msgFriendRemoveAck", p.handleFriendRemoveAck)
+	p.friendRequester.RegisterCallback(MsgIdFriendRecommendationList, p.handleFriendRecommendationList)
+	p.friendRequester.RegisterForward(MsgIdFriendAdd, p.handleFriendAdd)
+	p.friendRequester.RegisterForward(MsgIdFriendRemove, p.handleFriendRemove)
+	p.friendRequester.RegisterForward(MsgIdFriendAddAck, p.handleFriendAddAck)
+	p.friendRequester.RegisterForward(MsgIdFriendRemoveAck, p.handleFriendRemoveAck)
 }
 
 // 添加好友
@@ -114,7 +123,7 @@ func (p *Player) handleFriendAdd(fromKey interface{}, args interface{}) {
 	}
 	fmt.Println("Player ", p.id, " added new friend ", pid)
 
-	p.friendRequester.RequestForward(fromKey, "msgFriendAddAck", &msgFriendAddAck{})
+	p.friendRequester.RequestForward(fromKey, MsgIdFriendAddAck, &msgFriendAddAck{})
 
 	fmt.Println("Player ", p.id, " ack add friend ", pid)
 }
@@ -143,7 +152,7 @@ func (p *Player) handleFriendRemove(fromKey interface{}, args interface{}) {
 	}
 	fmt.Println("Player ", p.id, " removed friend ", pid)
 
-	p.friendRequester.RequestForward(fromKey, "msgFriendRemoveAck", &msgFriendRemoveAck{})
+	p.friendRequester.RequestForward(fromKey, MsgIdFriendRemoveAck, &msgFriendRemoveAck{})
 
 	fmt.Println("Player ", p.id, " ack remove friend ", pid)
 }
@@ -161,22 +170,22 @@ func (p *Player) handleFriendRemoveAck(fromKey interface{}, args interface{}) {
 
 // 更新等级
 func (p *Player) updateFriendInfo() {
-	p.friendRequester.Request("msgUpdateFriendInfo", &msgUpdateFriendInfo{selfId: p.id, level: p.level})
+	p.friendRequester.Request(MsgIdUpdateFriendInfo, &msgUpdateFriendInfo{selfId: p.id, level: p.level})
 }
 
 // 请求推荐列表
 func (p *Player) getFriendRecommendationList() {
-	p.friendRequester.Request("msgFriendRecommendationList", &msgRecommendationFriendListReq{selfId: p.id, level: p.level})
+	p.friendRequester.Request(MsgIdFriendRecommendationList, &msgRecommendationFriendListReq{selfId: p.id, level: p.level})
 }
 
 // 添加好友请求
 func (p *Player) addFriendReq(pid int32) {
-	p.friendRequester.RequestForward(pid, "msgFriendAdd", &msgFriendAddReq{})
+	p.friendRequester.RequestForward(pid, MsgIdFriendAdd, &msgFriendAddReq{})
 }
 
 // 删除好友请求
 func (p *Player) removeFriendReq(pid int32) {
-	p.friendRequester.RequestForward(pid, "msgFriendRemove", &msgFriendRemoveReq{})
+	p.friendRequester.RequestForward(pid, MsgIdFriendRemove, &msgFriendRemoveReq{})
 }
 
 // 创建Player
@@ -205,12 +214,12 @@ func (s *FriendService) Init() {
 }
 
 func (s *FriendService) RegisterHandles() {
-	s.RegisterHandle("msgUpdateFriendInfo", func(_ ISender, args interface{}) {
+	s.RegisterHandle(MsgIdUpdateFriendInfo, func(_ ISender, args interface{}) {
 		msg := args.(*msgUpdateFriendInfo)
 		s.PlayerIds = append(s.PlayerIds, msg.selfId)
 		fmt.Println("Player ", msg.selfId, " update friend info, now player list ", s.PlayerIds)
 	})
-	s.RegisterHandle("msgFriendRecommendationList", func(sender ISender, args interface{}) {
+	s.RegisterHandle(MsgIdFriendRecommendationList, func(sender ISender, args interface{}) {
 		req := args.(*msgRecommendationFriendListReq)
 		var pidList []int32
 		for _, pid := range s.PlayerIds {
@@ -219,7 +228,7 @@ func (s *FriendService) RegisterHandles() {
 			}
 			pidList = append(pidList, int32(pid))
 		}
-		sender.Send("msgFriendRecommendationList", &msgRecommendationFriendListResp{friendList: pidList})
+		sender.Send(MsgIdFriendRecommendationList, &msgRecommendationFriendListResp{friendList: pidList})
 		fmt.Println("Player ", req.selfId, " get friend recommendation list ", pidList)
 	})
 }

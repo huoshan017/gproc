@@ -8,9 +8,15 @@ import (
 	"time"
 )
 
-var test_string = `e32qr213343wg43wg4w3g4wdbsrbsrw3e3$#@#%$%^$)_8998t349t43gw34btrsbtrsh4a122176i87v是然而色不同认识你是32它35654`
+const (
+	MsgIdChat    = 1
+	MsgIdChatAck = 2
+)
 
-var playerIds = []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}
+var (
+	test_string = `e32qr213343wg43wg4w3g4wdbsrbsrw3e3$#@#%$%^$)_8998t349t43gw34btrsbtrsh4a122176i87v是然而色不同认识你是32它35654`
+	playerIds   = []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}
+)
 
 func getAChatMessage() string {
 	data := []byte(test_string)
@@ -52,15 +58,15 @@ func (p *ChatPlayer) InitRequester(chatService *ChatService) {
 }
 
 func (p *ChatPlayer) RegisterHandles() {
-	p.chatRequester.RegisterForward("msgChat", p.handleChat)
-	p.chatRequester.RegisterForward("msgChatAck", p.handleChatAck)
+	p.chatRequester.RegisterForward(MsgIdChat, p.handleChat)
+	p.chatRequester.RegisterForward(MsgIdChatAck, p.handleChatAck)
 }
 
 func (p *ChatPlayer) handleChat(fromKey interface{}, args interface{}) {
 	chatMsg := args.(*msgChat)
 	fmt.Println("player ", p.id, " recv message ", chatMsg.message, " from player ", fromKey)
 	ack := &msgChatAck{message: chatMsg.message}
-	err := p.chatRequester.RequestForward(fromKey, "msgChatAck", ack)
+	err := p.chatRequester.RequestForward(fromKey, MsgIdChatAck, ack)
 	if err != nil {
 		fmt.Println("player ", p.id, " request forward player ", fromKey, " err: ", err)
 		return
@@ -74,7 +80,7 @@ func (p *ChatPlayer) handleChatAck(fromKey interface{}, args interface{}) {
 }
 
 func (p *ChatPlayer) ChatTo(pid int32, message string) {
-	err := p.chatRequester.RequestForward(pid, "msgChat", &msgChat{message: message})
+	err := p.chatRequester.RequestForward(pid, MsgIdChat, &msgChat{message: message})
 	if err != nil {
 		fmt.Println("player ", p.id, " chat to ", pid, " err: ", err)
 	} else {

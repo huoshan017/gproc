@@ -18,7 +18,7 @@ type msg struct {
 	typ     msgType
 	fromKey interface{}
 	toKey   interface{}
-	name    string
+	id      uint32
 	args    interface{}
 	sender  ISender
 }
@@ -28,7 +28,7 @@ func (m *msg) reset() {
 	m.typ = 0
 	m.fromKey = nil
 	m.toKey = nil
-	m.name = ""
+	m.id = 0
 	m.args = nil
 	m.sender = nil
 }
